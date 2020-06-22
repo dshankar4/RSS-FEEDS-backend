@@ -161,6 +161,20 @@ class userTemplate(Resource):
         else:
             return {'Format':'True'}, 200
 
+#Edit a feed
+class  editFeed(Resource):
+    def post(self, feedId):
+        title = request.get_json()['title']
+        summary = request.get_json()['summary']
+        category=request.get_json()['category']
+        author=request.get_json()['author']
+        link=request.get_json()['link']
+        fId = checkFeedId(feedId)
+        if fId:
+            records=feedEdit(title,summary,category,author,link,feedId)
+            return {'Format': 'True'}, 200
+        else:
+            return {'Format': 'False'}  
 @app.route('/')
 def hello():
     return "Hello World!!!"
