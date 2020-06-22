@@ -127,6 +127,39 @@ class getValues(Resource):
         result = filtersort(category.capitalize(),filterType,order,time,records,recordsNoRep,key,search)
         return result, 200
 
+# User Template, A new feed by user            
+class userTemplate(Resource):
+    def post(self):
+        feedsList=[]
+        userId=request.get_json()['userId']
+        feedTitle=request.get_json()['feedTitle']
+        summary=request.get_json()['summary']        
+        imageUrl=request.get_json()['imageUrl']
+        category=request.get_json()['category']
+        author=request.get_json()['author']
+        link=request.get_json()['link']
+        logo='https://th.bing.com/th/id/OIP.w2McZSq-EYWxh02iSvC3xwHaHa?pid=Api&rs=1'
+        likes=0,
+        dislikes=0,
+        time= datetime.now()
+        time=str(time.strftime('%Y-%m-%d %H:%M:%S'))+'+5:30' 
+        times = datetime.strptime(time[:19],'%Y-%m-%d %H:%M:%S')
+        dispTime= str(times.strftime('%H:%M:%S %d %B %Y,%A'))
+        d = datetime.strptime(dispTime[:5],"%H:%M")
+        dispTime=str(d.strftime("%I:%M %p"))+' on '+dispTime[8:]
+        feedsList.append(feeds(feedTitle,summary,time,imageUrl,category,author,link,dispTime,logo,userId))
+        
+        if len(feedTitle)==0 or len(summary)==0 or len(author)==0 or checkUserId(userId)==0:
+            return {'Format':'False'}, 400
+        if len(imageUrl)==0:
+            imageUrl='https://www.zylogelastocomp.com/wp-content/uploads/2019/03/notfound.png'
+        if len(category)==0:
+            category='Headline'
+        value=getFeeds(feedsList,1)
+        if value==0:
+            return {'Format':'False'}, 400
+        else:
+            return {'Format':'True'}, 200
 
 @app.route('/')
 def hello():
