@@ -260,7 +260,23 @@ class incrementLikes(Resource):
                 return {'Format': 'False'}, 400
         else:
             return {'Format': 'False'}, 400
-    
+api.add_resource(register,'/users/register')
+api.add_resource(login,'/users/login')
+api.add_resource(categoryList,'/category')
+api.add_resource(getFeedById,'/feed/<int:feedId>')
+api.add_resource(getValues,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>')
+api.add_resource(getValuesById,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>/<string:search>','/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>')
+api.add_resource(handleComment,'/comment','/comment/<string:feedId>')
+api.add_resource(userTemplate,'/usertemplate')
+api.add_resource(editFeed,'/edit/<int:feedId>')
+api.add_resource(incrementLikes,'/incrementLikes/<int:userId>/<int:feedId>')
+api.add_resource(incrementDislikes,'/incrementDislikes/<int:userId>/<int:feedId>')
+api.add_resource(addUrl,'/addUrl')
+api.add_resource(addRole,'/addRole')
+api.add_resource(handleRoles,'/roles','/roles/<string:role>/<int:c>/<int:r>/<int:u>/<int:d>','/roles/<string:role>/<int:c>/<int:r>/<int:u>/<int:d>/<int:userId>')
+api.add_resource(deleteUserById,'/users/delete/<int:userId>')
+api.add_resource(deleteFeedById,'/users/deletefeed/<int:feedId>/<int:userId>')
+   
 @app.route('/')
 def hello():
     return "Hello World!!!"
