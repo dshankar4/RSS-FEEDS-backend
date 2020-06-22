@@ -174,7 +174,26 @@ class  editFeed(Resource):
             records=feedEdit(title,summary,category,author,link,feedId)
             return {'Format': 'True'}, 200
         else:
-            return {'Format': 'False'}  
+            return {'Format': 'False'} 
+
+# Handled get and post comments
+class handleComment(Resource):
+    def get(self,feedId=1):
+        if checkFeedId(feedId):
+            return getComment(feedId),200
+        else:
+            return {'Format': 'False'}, 400
+    def post(self):
+        feedId = request.get_json()['feedId']
+        userId = request.get_json()['userId']
+        comments = request.get_json()['comments']
+        if checkFeedId(feedId) and checkUserId(userId):
+            return addComment(feedId,userId,comments), 200
+        else:
+            return {'Format': 'False'}, 400
+
+
+ 
 @app.route('/')
 def hello():
     return "Hello World!!!"
