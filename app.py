@@ -233,7 +233,34 @@ class deleteFeedById(Resource):
         else:
             return {'Format': 'False'}, 401
 
+#Increase dislikes
+class incrementDislikes(Resource):
+    def post(self,userId,feedId):
+        uId = checkUserId(userId)
+        if uId:
+            fId = checkFeedId(feedId)
+            if fId:
+                disLikes = addDislikes(userId,feedId)
+                return {'Format': 'True'}, 200              
+            else:
+                return {'Format': 'False'}, 400
+        else:
+            return {'Format': 'False'}, 400
 
+#Increase likes
+class incrementLikes(Resource):
+    def post(self,userId,feedId):
+        uId = checkUserId(userId)
+        if uId:
+            fId = checkFeedId(feedId)
+            if fId:
+                likes = addLikes(userId,feedId)
+                return {'Format': 'True'}, 200              
+            else:
+                return {'Format': 'False'}, 400
+        else:
+            return {'Format': 'False'}, 400
+    
 @app.route('/')
 def hello():
     return "Hello World!!!"
