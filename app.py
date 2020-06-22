@@ -193,7 +193,47 @@ class handleComment(Resource):
             return {'Format': 'False'}, 400
 
 
- 
+ #Adding a new feedXml
+class addUrl(Resource):
+    def post(self):
+        url = request.get_json()['url']
+        parsed=feedparser.parse(url)
+        categoryUrl = request.get_json()['category'].capitalize()
+        if categoryUrl in category:
+            if len(parsed.feed)!=0:
+                feedUrl = feedUrlAdd(url,categoryUrl)
+                return feedUrl
+        return {'Format': 'False'}
+
+# Adding a new role        
+class addRole(Resource):
+    def post(self):
+        role = request.get_json()['role']
+        create = request.get_json()['create']
+        read = request.get_json()['read']
+        update = request.get_json()['update']
+        delete = request.get_json()['delete']
+        return newRole(role,create,read,update,delete), 200
+        
+#Delete User
+class deleteUserById(Resource):
+    def get(self,userId):
+        if checkUserId(userId):
+            deleteUser(userId)
+            return {'Format': 'True'}, 200              
+        else:
+            return {'Format': 'False'}, 401
+
+#Delete Feed
+class deleteFeedById(Resource):
+    def get(self,feedId,userId):
+        if checkFeedId(feedId) and checkUserId(userId):
+            deleteFeed(feedId,userId)
+            return {'Format': 'True'}, 200              
+        else:
+            return {'Format': 'False'}, 401
+
+
 @app.route('/')
 def hello():
     return "Hello World!!!"
