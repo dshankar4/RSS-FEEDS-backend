@@ -1,6 +1,6 @@
 from models import feeds
 from Db import selectEmail,registerUser,addComment,getComment,feedEdit,feedUrlAdd,addLikes,addDislikes
-from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,newRole,deleteFeed,deleteUser,getSpecialRights
+from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,newRole,deleteFeed,deleteUser,getSpecialRights, commentDelete,getUser, getAccess, updateAccess,deleteAccess
 from flask import Flask,request,render_template,redirect, url_for,flash
 from data import returnData,filtersort,returnRecord,returnNoRepRecord
 from flask_bcrypt import Bcrypt
@@ -278,7 +278,48 @@ class deleteFeedById(Resource):
         else:
             return {'Format': 'False'}, 401
 
+class deleteComment(Resource):
+    def delete(self,commentId):
+        comment = commentDelete(commentId)
+        return comment
 
+class user(Resource):
+    def get(self,userId):
+        user = getUser(userId)
+        return user
+
+class role(Resource):
+    def get(self):
+        return getRole()  
+    def delete(self):
+        id = request.get_json()['id']
+        return deleteRole(id)
+    def post(self):
+        id = request.get_json()['id']
+        role = request.get_json()['role']
+        return newRole(id,role)
+
+class access(Resource):
+    def get(self):
+        userId = request.get_json()['userId']
+        return getAccess(userId=None)    
+    def post(self):
+        userId = request.get_json()['userId']
+        colId = request.get_json()['colId']
+        cFeed = request.get_json()['cFeed']
+        rFeed = request.get_json()['rFeed']
+        uFeed = request.get_json()['uFeed']
+        dFeed = request.get_json()['dFeed']
+        rolesTable = request.get_json()['rolesTable']
+        usersTable = request.get_json()['usersTable']
+        feedsTable = request.get_json()['feedsTable']
+        userLikeTable= request.get_json()['userLikeTable']
+        commentTable= request.get_json()['commentTable']
+        feedXmlsTable= request.get_json()['feedXmlsTable']
+        return updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable)
+    def delete(self):
+        id = request.get_json()['id']
+        return deleteAccess(id)
 api.add_resource(register,'/users/register')
 api.add_resource(login,'/users/login')
 api.add_resource(categoryList,'/category')
@@ -293,6 +334,10 @@ api.add_resource(incrementDislikes,'/incrementDislikes/<int:userId>/<int:feedId>
 api.add_resource(addUrl,'/addUrl')
 api.add_resource(deleteUserById,'/users/delete/<int:userId>')
 api.add_resource(deleteFeedById,'/users/deletefeed/<int:feedId>/<int:userId>')
+api.add_resource(deleteComment,'/deletecomment/<int:commentId>')
+api.add_resource(user,'/user/<int:userId>')
+api.add_resource(role,'/role')
+api.add_resource(access,'/access')
 db= SQLAlchemy(app)
 
 class FeedXmls(db.Model):
@@ -414,7 +459,7 @@ class RolesController(Controllers):
         return False
 
 class UsersController(Controllers):
-    form_columns=['adminId','firstname','lastname','email','password']
+    form_columns=['roles','firstname','lastname','email','password','userId']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -444,7 +489,7 @@ class UsersController(Controllers):
         return False
 
 class FeedsController(Controllers):
-    form_columns=['userId','feedTitle','summary','time','imageUrl','category','author','link','likes','dislikes','dispTime','logo']
+    form_columns=['users','feedTitle','summary','time','imageUrl','category','author','link','likes','dislikes','dispTime','logo']
     column_filters = ['feedTitle','time','category','likes']
     column_editable_list = ['feedTitle','summary']
     def is_accessible(self):        
@@ -476,7 +521,7 @@ class FeedsController(Controllers):
         return False
 
 class UserLikeController(Controllers):
-    form_columns=['userId','feedId','like','dislike']
+    form_columns=['users','feedId','like','dislike']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -507,7 +552,7 @@ class UserLikeController(Controllers):
         
 
 class CommentController(Controllers):
-    form_columns=['userId','feedId','comment']
+    form_columns=['users','feedId','comment']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -568,27 +613,31 @@ class FeedXmlsController(Controllers):
         
 class Controller(Controllers):
     def is_accessible(self):
-        records=getSpecialRights(current_user.userId)[0]
-        if int(records[1])==1:
-            return True
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if int(record[1])==1:
+                return True
         return False
     @property
     def can_create(self):
-        records=getSpecialRights(current_user.userId)[0]
-        if int(records[1])==1:
-            return True
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if int(record[1])==1:
+                return True
         return False
     @property
     def can_edit(self):
-        records=getSpecialRights(current_user.userId)[0]
-        if int(records[1])==1:
-            return True
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if int(record[1])==1:
+                return True
         return False
     @property
     def can_delete(self):
-        records=getSpecialRights(current_user.userId)[0]
-        if int(records[1])==1:
-            return True
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if int(record[1])==1:
+                return True
         return False
         
 @event.listens_for(Users.password,'set',retval=True)
@@ -597,7 +646,7 @@ def hashPass(target,value,oldvalue,initiator):
         return bcrypt.generate_password_hash(value).decode('utf-8')
     return value
     
-app.config['FLASK_ADMIN_SWATCH'] = 'Flatly' 
+app.config['FLASK_ADMIN_SWATCH'] = 'Darkly' 
 admin=Admin(app,name='Admin Panel',template_mode='bootstrap3',index_view=MyAdminIndexView())
 login_manager= LoginManager()
 login_manager.init_app(app)

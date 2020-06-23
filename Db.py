@@ -282,7 +282,7 @@ def checkUserId(userId):
         return 0
 
 # New Role appending in Database
-def newRole(role):
+def newRole(id,role):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
     c.execute("SELECT * FROM roles where role=?",(role,))
@@ -291,7 +291,7 @@ def newRole(role):
         conn.commit()
         conn.close()
         return {'Format':'False','message':'Role already exist'}, 401
-    c.execute("INSERT INTO roles (role) VALUES (:role)",{'role':role})
+    c.execute("INSERT INTO roles (adminId,role) VALUES (:adminId,:role)",{'adminId':id,'role':role})
     conn.commit()
     conn.close()
     return {'Format':'True'}, 200
@@ -314,24 +314,65 @@ def getRole():
         return {'Format':'False'}, 401
 
 #To delete a role
-def deleteRole():
+def deleteRole(adminId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
-    c.execute("SELECT * FROM roles where role=?",(role,))
+    c.execute("SELECT * FROM roles where adminId=?",(adminId,))
     records = c.fetchone()
     if records:
+        c.execute("DELETE FROM roles WHERE adminId=(:adminId)",{'adminId':adminId})
         conn.commit()
         conn.close()
-        return {'Format':'False','message':'Role already exist'}, 401
-    c.execute("DELETE FROM roles WHERE roles=(:role)",{'role':role})
+        return {'Format':'True'}, 200
+    else:
+        return {'Format':'False'}, 401
+
+def getAccess(userId):
+    conn = sqlite3.connect('Feeds.db')
+    c= conn.cursor()
+    c.execute("SELECT * FROM specialRights")
+    record = c.fetchall()
     conn.commit()
     conn.close()
-    return {'Format':'True'}, 200
+    rolesDict={}
+    if record:
+        rolesDict['Values']=list()
+        for rows in record:
+            rolesDict['Values'].append({'userId':rows[1],'cFeed':rows[2],'rFeed':rows[3],'uFeed':rows[4],'dFeed':rows[5],'rowsTable':rows[6],'usersTable':rows[7],'feedsTable':rows[8],'userLikeTable':rows[9],'commentTable':rows[10],'feedXmlsTable':rows[11]})
+        return rolesDict, 200
+    else:
+        return {'Format':'False'}, 401
 
-# def showAccess()    
-# def updateAccess()
-# def deleteAccess()    
-    
+def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
+    conn = sqlite3.connect('Feeds.db')
+    c= conn.cursor()
+    c.execute("SELECT * FROM specialRights where colId=?",(colId,))
+    records = c.fetchone()
+    if records:
+        c.execute("UPDATE specialRights SET cFeed = (:cFeed), rFeed = (:rFeed), uFeed = (:uFeed), dFeed = (:dFeed), rolesTable = (:rolesTable), usersTable = (:usersTable), feedsTable = (:feedsTable), userLikeTable = (:userLikeTable), commentTable = (:commentTable), feedXmlsTable = (:feedXmlsTable) WHERE colId = (:id)",{'cFeed':cFeed,'rFeed':rFeed,'uFeed':uFeed,'dFeed':dFeed,'rolesTable':rolesTable,'usersTable':usersTable,'feedsTable':feedsTable,'userLikeTable':userLikeTable,'commentTable':commentTable,'feedXmlsTable':feedXmlsTable,'id':colId})
+        conn.commit()
+        conn.close()
+        return {"message":"updated"}
+    else:
+        c.execute("INSERT into specialRights (cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable,userId,colId) VALUES (:cFeed,:rFeed,:uFeed,:dFeed,:rolesTable,:usersTable,:feedsTable,:userLikeTable,:commentTable,:feedXmlsTable,:userId,:colId) ",{'cFeed':cFeed,'rFeed':rFeed,'uFeed':uFeed,'dFeed':dFeed,'rolesTable':rolesTable,'usersTable':usersTable,'feedsTable':feedsTable,'userLikeTable':userLikeTable,'commentTable':commentTable,'feedXmlsTable':feedXmlsTable,'userId':userId,'colId':colId})
+        conn.commit()
+        conn.close()
+        return {"message":"new role"}
+
+def deleteAccess(id):
+    conn = sqlite3.connect('Feeds.db')
+    c= conn.cursor()
+    c.execute("SELECT * FROM specialRights where colId=?",(id,))
+    records = c.fetchone()
+    if records:
+        c.execute("DELETE FROM specialRights where colId=?",(id,))
+        conn.commit()
+        conn.close()
+        return {"message":"access deleted"}
+    else:
+        return {"message":"incorrect access"}
+
+
 def deleteFeed(feedId,userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -354,4 +395,30 @@ def getSpecialRights(userId):
     conn.commit()
     conn.close()
     return records
-    
+
+def commentDelete(commentId):
+    conn = sqlite3.connect('Feeds.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM comments where commentId=(:commentId)",{'commentId':commentId})
+    if c.fetchone():
+        c.execute("DELETE FROM comments where commentId = (:commentId)",{'commentId':commentId})
+        conn.commit()
+        conn.close()
+        return {"message":"comment deleted"}
+    else:
+        return {"message":"comment doesn't exist"}
+
+def getUser(userId):
+    conn = sqlite3.connect('Feeds.db')
+    c = conn.cursor()
+    c.execute("SELECT * FROM feeds where userId = (:userId)",{'userId':userId})
+    record = c.fetchall()
+    if record:
+        records=[]
+        for feed in record:
+            records.append({'id':feed[0],'feedTitle':feed[1],'summary':feed[2],'dispTime':feed[3],'imgUrl':feed[4],'category':feed[5],'author':feed[6],'link':feed[7],'like':feed[8],'dislike':feed[9],'time':feed[10],'logo':feed[11],'userId':feed[12]})
+        conn.commit()
+        conn.close()
+        return records
+    else:
+        return {"message":"no feeds"}
