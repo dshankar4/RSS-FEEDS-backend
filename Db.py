@@ -10,15 +10,12 @@ def handleDb():
     c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='roles' """)
     if c.fetchone()[0]!=1 : 
         c.execute("""CREATE TABLE roles (adminId INTEGER PRIMARY KEY,
-                                        role TEXT,
-                                        cFeed INTEGER,
-                                        rFeed INTEGER,
-                                        uFeed INTEGER,
-                                        dFeed INTEGER)""")
+                                        role TEXT)""")
         conn.commit()
-        c.execute("INSERT INTO roles VALUES (:adminId,:role,:cFeed,:rFeed,:uFeed,:dFeed)",{'adminId':0,'role':'admin','cFeed':1,'rFeed':1,'uFeed':1,'dFeed':1})
-        c.execute("INSERT INTO roles VALUES (:adminId,:role,:cFeed,:rFeed,:uFeed,:dFeed)",{'adminId':1,'role':'user','cFeed':1,'rFeed':1,'uFeed':0,'dFeed':0})
-
+        c.execute("INSERT INTO roles VALUES (:adminId,:role)",{'adminId':1,'role':'admin'})
+        c.execute("INSERT INTO roles VALUES (:adminId,:role)",{'adminId':2,'role':'user'})
+        conn.commit()
+        
     # Create users table
     c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='users' """)
     if c.fetchone()[0]!=1 : 
@@ -28,14 +25,32 @@ def handleDb():
                                         lastname TEXT,
                                         email TEXT,
                                         password TEXT,
+                                        FOREIGN KEY(adminId) REFERENCES roles(adminId))""")  
+        conn.commit()
+        bcrypt = Bcrypt()
+        c.execute("INSERT INTO users (adminId,firstname,lastname,email,password) VALUES (:adminId,:firstname,:lastname,:email,:password)",{'adminId':1,'firstname':'admin','lastname':'admin','email':'admin@admin.in','password':bcrypt.generate_password_hash('admin').decode('utf-8')})
+        c.execute("INSERT INTO users (adminId,firstname,lastname,email,password) VALUES (:adminId,:firstname,:lastname,:email,:password)",{'adminId':2,'firstname':'user','lastname':'user','email':'user@user.in','password':bcrypt.generate_password_hash('user').decode('utf-8')})
+        conn.commit()
+        
+    # Create specialRights table
+    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='specialRights' """)
+    if c.fetchone()[0]!=1 : 
+        c.execute("""CREATE TABLE specialRights (colId INTEGER PRIMARY KEY AUTOINCREMENT,
+                                        userId INTEGER,
                                         cFeed INTEGER,
                                         rFeed INTEGER,
                                         uFeed INTEGER,
                                         dFeed INTEGER,
-                                        FOREIGN KEY(adminId) REFERENCES roles(adminId))""")  
+                                        rolesTable INTEGER,
+                                        usersTable INTEGER,
+                                        feedsTable INTEGER,
+                                        userLikeTable INTEGER,
+                                        commentTable INTEGER,
+                                        feedXmlsTable INTEGER,
+                                        FOREIGN KEY(userId) REFERENCES users(userId))""")
         conn.commit()
-        bcrypt = Bcrypt()
-        c.execute("INSERT INTO users (adminId,firstname,lastname,email,password,cFeed,rFeed,uFeed,dFeed) VALUES (:adminId,:firstname,:lastname,:email,:password,:cFeed,:rFeed,:uFeed,:dFeed)",{'adminId':0,'firstname':'admin','lastname':'admin','email':'admin@admin.in','password':bcrypt.generate_password_hash('admin').decode('utf-8'),'cFeed':1,'rFeed':1,'uFeed':1,'dFeed':1})
+        c.execute("INSERT INTO specialRights(userId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable) VALUES (:userId,:cFeed,:rFeed,:uFeed,:dFeed,:rolesTable,:usersTable,:feedsTable,:userLikeTable,:commentTable,:feedXmlsTable)",{'userId':1,'cFeed':1,'rFeed':1,'uFeed':1,'dFeed':1,'rolesTable':1,'usersTable':1,'feedsTable':1,'userLikeTable':1,'commentTable':1,'feedXmlsTable':1})
+
     # Create feeds table 
     c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='feeds' """)
     if c.fetchone()[0]!=1 : 
@@ -100,7 +115,7 @@ def registerUser(first_name,last_name,email,password,role):
     c= conn.cursor()
     c.execute("SELECT * FROM roles where role=?",(role,))
     role = c.fetchone()
-    c.execute("INSERT INTO users (adminId,firstname,lastname,email,password,cFeed,rFeed,uFeed,dFeed) VALUES (:adminId,:firstname,:lastname,:email,:password,:c,:r,:u,:d)",{'adminId':role[0],'firstname':first_name,'lastname':last_name,'email':email,'password':password,'c':role[2],'r':role[3],'u':role[4],'d':role[5]})
+    c.execute("INSERT INTO users (adminId,firstname,lastname,email,password) VALUES (:adminId,:firstname,:lastname,:email,:password)",{'adminId':role[0],'firstname':first_name,'lastname':last_name,'email':email,'password':password})
     conn.commit()
     conn.close()
     
@@ -197,21 +212,6 @@ def feedUrlAdd(url,newCategory):
     conn.close()
     return {'Format': 'True'}
 
-# New Role appending in Database
-def newRole(role,create,read,update,delete):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM roles where role=? and cFeed=? and rFeed=? and uFeed=? and dFeed=?",(role,create,read,update,delete))
-    records = c.fetchone()
-    if records:
-        conn.commit()
-        conn.close()
-        return {'Format':'False','message':'Role already exist'}, 401
-    c.execute("INSERT INTO roles (role,cFeed,rFeed,uFeed,dFeed) VALUES (:role,:create,:read,:update,:delete)",{'role':role,'create':create,'read':read,'update':update,'delete':delete})
-    conn.commit()
-    conn.close()
-    return {'Format':'True'}, 200
-
 def feedEdit(title,summary,category,author,link,feedId):
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -281,6 +281,22 @@ def checkUserId(userId):
     else:
         return 0
 
+# New Role appending in Database
+def newRole(role):
+    conn = sqlite3.connect('Feeds.db')
+    c= conn.cursor()
+    c.execute("SELECT * FROM roles where role=?",(role,))
+    records = c.fetchone()
+    if records:
+        conn.commit()
+        conn.close()
+        return {'Format':'False','message':'Role already exist'}, 401
+    c.execute("INSERT INTO roles (role) VALUES (:role)",{'role':role})
+    conn.commit()
+    conn.close()
+    return {'Format':'True'}, 200
+
+#To display all roles
 def getRole():
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -292,36 +308,30 @@ def getRole():
     if record:
         rolesDict['Values']=list()
         for rows in record:
-            rolesDict['Values'].append({'Role':rows[1],'Create': rows[2],'Read':rows[3],'Edit':rows[4],'Delete':rows[5]})
+            rolesDict['Values'].append({'adminId':rows[0],'Role':rows[1]})
         return rolesDict, 200
     else:
         return {'Format':'False'}, 401
-        
-def updateRole(role,c,r,u,d,userId=None):
-    conn = sqlite3.connect('Feeds.db')
-    cur= conn.cursor()
-    cur.execute("SELECT * FROM roles where role=?",(role,))
-    records = cur.fetchone()
-    if records:
-        if(userId==None):
-            cur.execute("SELECT adminId FROM roles where role=?",(role,))
-            records = cur.fetchone()
-            cur.execute("UPDATE roles set cFeed=(?),rFeed=(?),uFeed=(?),dFeed=(?) where adminId=(?)",(c,r,u,d,records[0]))
-            cur.execute("UPDATE users set cFeed=(?),rFeed=(?),uFeed=(?),dFeed=(?) where adminId=(?)",(c,r,u,d,records[0]))
-        else:
-            cur.execute("SELECT adminId FROM roles where role=?",(role,))
-            records = cur.fetchone()
-            cur.execute("UPDATE users set cFeed=?,rFeed=?,uFeed=?,dFeed=? where userId=?",(c,r,u,d,userId))
-            
-        conn.commit()
-        conn.close()
-        return {'Format':'True'}, 200
-    else:
-        conn.commit()
-        conn.close()
-        return {'Format':'False'}, 401
-    
 
+#To delete a role
+def deleteRole():
+    conn = sqlite3.connect('Feeds.db')
+    c= conn.cursor()
+    c.execute("SELECT * FROM roles where role=?",(role,))
+    records = c.fetchone()
+    if records:
+        conn.commit()
+        conn.close()
+        return {'Format':'False','message':'Role already exist'}, 401
+    c.execute("DELETE FROM roles WHERE roles=(:role)",{'role':role})
+    conn.commit()
+    conn.close()
+    return {'Format':'True'}, 200
+
+# def showAccess()    
+# def updateAccess()
+# def deleteAccess()    
+    
 def deleteFeed(feedId,userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -336,5 +346,12 @@ def deleteUser(userId):
     conn.commit()
     conn.close()
     
-
+def getSpecialRights(userId):
+    conn = sqlite3.connect('Feeds.db')
+    c= conn.cursor()
+    c.execute("SELECT * FROM specialRights WHERE userId=?",(userId,))
+    records=c.fetchall()
+    conn.commit()
+    conn.close()
+    return records
     

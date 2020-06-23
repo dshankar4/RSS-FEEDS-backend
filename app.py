@@ -1,7 +1,7 @@
 from models import feeds
 from Db import selectEmail,registerUser,addComment,getComment,feedEdit,feedUrlAdd,addLikes,addDislikes
-from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,updateRole,deleteFeed,deleteUser
-from flask import Flask,request,render_template
+from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,newRole,deleteFeed,deleteUser,getSpecialRights
+from flask import Flask,request,render_template,redirect, url_for,flash
 from data import returnData,filtersort,returnRecord,returnNoRepRecord
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import  JWTManager,create_access_token
@@ -10,9 +10,12 @@ from datetime import datetime
 import feedparser
 import os
 import re
-from flask_admin import Admin
+from sqlalchemy import event
+from flask_admin import Admin, AdminIndexView
+from flask_admin.menu import MenuLink
 from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager,UserMixin,login_user,current_user,logout_user,login_required
 
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
@@ -22,8 +25,6 @@ app.config['SECRET_KEY']=os.environ.get('SECRET_KEY')
 app.config['JWT_SECRET_KEY']=os.environ.get('JWT_SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///feeds.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-db= SQLAlchemy(app) 
-admin=Admin(app)
 
 accessToken=None
 records=returnRecord()
@@ -62,7 +63,6 @@ class login(Resource):
         if records==None:
             return {'Format': 'False'}, 401    
         elif bcrypt.check_password_hash(records[5], password):
-            getRole(records[1])
             access_token = create_access_token(identity = {'email': email})
             accessToken=access_token
             return {"access_token": access_token}, 201
@@ -212,17 +212,6 @@ class addUrl(Resource):
                 return feedUrl
         return {'Format': 'False'}
 
-# Admin
-# Adding a new role        
-class addRole(Resource):
-    def post(self):
-        role = request.get_json()['role']
-        create = request.get_json()['create']
-        read = request.get_json()['read']
-        update = request.get_json()['update']
-        delete = request.get_json()['delete']
-        return newRole(role,create,read,update,delete), 200
-
 # Admin         
 # Adding a new role by admin
 class adminRegister(Resource):
@@ -269,20 +258,6 @@ class incrementLikes(Resource):
         else:
             return {'Format': 'False'}, 400
 
-# Admin    
-# Handle roles
-class handleRoles(Resource):
-    def get(self,role=None,c=None,r=None,u=None,d=None,userId=None):
-        if role==None and userId==None:
-            return getRole()
-        elif role!=None and userId==None:
-            return updateRole(role,c,r,u,d)
-        else:
-            if checkUserId(userId):
-                return updateRole(role,c,r,u,d,userId)
-            else:
-                return {'Format': 'False'}, 401
-
 # Admin
 # Delete User
 class deleteUserById(Resource):
@@ -316,10 +291,9 @@ api.add_resource(editFeed,'/edit/<int:feedId>')
 api.add_resource(incrementLikes,'/incrementLikes/<int:userId>/<int:feedId>')
 api.add_resource(incrementDislikes,'/incrementDislikes/<int:userId>/<int:feedId>')
 api.add_resource(addUrl,'/addUrl')
-api.add_resource(addRole,'/addRole')
-api.add_resource(handleRoles,'/roles','/roles/<string:role>/<int:c>/<int:r>/<int:u>/<int:d>','/roles/<string:role>/<int:c>/<int:r>/<int:u>/<int:d>/<int:userId>')
 api.add_resource(deleteUserById,'/users/delete/<int:userId>')
 api.add_resource(deleteFeedById,'/users/deletefeed/<int:feedId>/<int:userId>')
+db= SQLAlchemy(app)
 
 class FeedXmls(db.Model):
     __tablename__="feedXmls"
@@ -330,40 +304,34 @@ class FeedXmls(db.Model):
 class Roles(db.Model):
     __tablename__="roles"
     adminId= db.Column('adminId',db.Integer,primary_key=True)
-    role=db.Column('role',db.String)
-    cFeed= db.Column('cFeed',db.Boolean)
-    rFeed= db.Column('rFeed',db.Boolean)
-    uFeed= db.Column('uFeed',db.Boolean)
-    dFeed= db.Column('dFeed',db.Boolean)
-
-class Users(db.Model):
+    role=db.Column('role',db.String,unique=True)
+    
+class Users(db.Model,UserMixin):
     __tablename__="users"
     userId=db.Column('userId',db.Integer,primary_key=True)
     adminId=db.Column('adminId',db.Integer,db.ForeignKey('roles.adminId'))
     roles = db.relationship("Roles", backref='adminId_roles')
     firstname=db.Column('firstname',db.String)
     lastname=db.Column('lastname',db.String)
-    password=db.Column('password',db.Unicode)
-    email=db.Column('email',db.String)
-    cFeed=db.Column('cFeed',db.Boolean)
-    rFeed=db.Column('rFeed',db.Boolean)
-    uFeed=db.Column('uFeed',db.Boolean)
-    dFeed=db.Column('dFeed',db.Boolean)
-    
+    email=db.Column('email',db.String,unique=True)
+    password=db.Column('password',db.String)
+    def get_id(self):
+       return (self.userId)
+       
 class Feeds(db.Model):
     __tablename__="feeds"
     feedId=db.Column('feedId',db.Integer,primary_key=True)
     userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
     users = db.relationship("Users", backref='userId_feeds')
-    feedTitle=db.Column('feedTitle',db.String)
+    feedTitle=db.Column('feedTitle',db.String,unique=True)
     summary=db.Column('summary',db.String)
     time=db.Column('time',db.String)
     imageUrl=db.Column('imageUrl',db.String)
     category=db.Column('category',db.String)
     author=db.Column('author',db.String)
     link=db.Column('link',db.String)
-    likes=db.Column('likes',db.Boolean)
-    dislikes=db.Column('dislikes',db.Boolean)
+    likes=db.Column('likes',db.Integer)
+    dislikes=db.Column('dislikes',db.Integer)
     dispTime=db.Column('dispTime',db.String)
     logo=db.Column('logo',db.String)
 
@@ -376,6 +344,7 @@ class Comments(db.Model):
     feeds = db.relationship("Feeds", backref='feedId_comments')
     comment=db.Column('comment',db.String)
 
+
 class UserLike(db.Model):
     __tablename__="userLike"
     userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
@@ -385,15 +354,298 @@ class UserLike(db.Model):
     like=db.Column('like',db.Boolean)
     dislike=db.Column('dislike',db.Boolean)
     likeId=db.Column('likeId',db.Integer,primary_key=True)
+    
+class SpecialRights(db.Model):
+    __tablename__="specialRights"
+    colId= db.Column('colId',db.Integer,primary_key=True)
+    userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
+    users = db.relationship("Users", backref='userId_specialRights')
+    cFeed= db.Column('cFeed',db.Boolean)
+    rFeed= db.Column('rFeed',db.Boolean)
+    uFeed= db.Column('uFeed',db.Boolean)
+    dFeed= db.Column('dFeed',db.Boolean)
+    rolesTable=db.Column('rolesTable',db.Boolean)
+    usersTable=db.Column('usersTable',db.Boolean)
+    feedsTable=db.Column('feedsTable',db.Boolean)
+    userLikeTable=db.Column('userLikeTable',db.Boolean)
+    commentTable=db.Column('commentTable',db.Boolean)
+    feedXmlsTable=db.Column('feedXmlsTable',db.Boolean)
+                
+class Controllers(ModelView):
+    def is_accessible(self):
+        return current_user.is_authenticated
+    def inaccessible_callback(self,name,**kwargs):
+        return redirect(url_for('adminLogin'))
 
-db.create_all()
+class MyAdminIndexView(AdminIndexView):
+    def is_visible(self):
+        return False
+    def is_accessible(self):
+        return current_user.is_authenticated
+        
+class RolesController(Controllers):
+    form_columns=['adminId','role']   
+    def is_accessible(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[6]) and bool(record[3]):
+                return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[6]) and bool(record[2]):
+                return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[6]) and bool(record[4]):
+                return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[6]) and bool(record[5]):
+                return True
+        return False
 
-admin.add_view(ModelView(Roles, db.session))
-admin.add_view(ModelView(FeedXmls, db.session))
-admin.add_view(ModelView(Users, db.session))
-admin.add_view(ModelView(Feeds, db.session))
-admin.add_view(ModelView(Comments, db.session))
-admin.add_view(ModelView(UserLike, db.session))
+class UsersController(Controllers):
+    form_columns=['adminId','firstname','lastname','email','password']
+    def is_accessible(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[7]) and bool(record[3]):
+                return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[7]) and bool(record[2]):
+                return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[7]) and bool(record[4]):
+                return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[7]) and bool(record[5]):
+                return True
+        return False
+
+class FeedsController(Controllers):
+    form_columns=['userId','feedTitle','summary','time','imageUrl','category','author','link','likes','dislikes','dispTime','logo']
+    column_filters = ['feedTitle','time','category','likes']
+    column_editable_list = ['feedTitle','summary']
+    def is_accessible(self):        
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[8]) and bool(record[3]):
+                return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[8]) and bool(record[2]):
+                return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[8]) and bool(record[4]):
+                return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[8]) and bool(record[5]):
+                return True
+        return False
+
+class UserLikeController(Controllers):
+    form_columns=['userId','feedId','like','dislike']
+    def is_accessible(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[9]) and bool(record[3]):
+                return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[9]) and bool(record[2]):
+                return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[9]) and bool(record[4]):
+                return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[9]) and bool(record[5]):
+                return True
+        return False
+        
+
+class CommentController(Controllers):
+    form_columns=['userId','feedId','comment']
+    def is_accessible(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[10]) and bool(record[3]):
+                return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[10]) and bool(record[2]):
+                return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[10]) and bool(record[4]):
+                return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[10]) and bool(record[5]):
+                return True
+        return False
+
+
+class FeedXmlsController(Controllers):
+    def is_accessible(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[11]) and bool(record[3]):
+                return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[11]) and bool(record[2]):
+                return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[11]) and bool(record[4]):
+                return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)
+        for record in records:
+            if bool(record[11]) and bool(record[5]):
+                return True
+        return False
+        
+class Controller(Controllers):
+    def is_accessible(self):
+        records=getSpecialRights(current_user.userId)[0]
+        if int(records[1])==1:
+            return True
+        return False
+    @property
+    def can_create(self):
+        records=getSpecialRights(current_user.userId)[0]
+        if int(records[1])==1:
+            return True
+        return False
+    @property
+    def can_edit(self):
+        records=getSpecialRights(current_user.userId)[0]
+        if int(records[1])==1:
+            return True
+        return False
+    @property
+    def can_delete(self):
+        records=getSpecialRights(current_user.userId)[0]
+        if int(records[1])==1:
+            return True
+        return False
+        
+@event.listens_for(Users.password,'set',retval=True)
+def hashPass(target,value,oldvalue,initiator):
+    if value!=oldvalue:
+        return bcrypt.generate_password_hash(value).decode('utf-8')
+    return value
+    
+app.config['FLASK_ADMIN_SWATCH'] = 'Flatly' 
+admin=Admin(app,name='Admin Panel',template_mode='bootstrap3',index_view=MyAdminIndexView())
+login_manager= LoginManager()
+login_manager.init_app(app)
+login_manager.login_view= 'login'
+
+
+@app.route('/login',methods=['POST','GET'])
+def adminLogin():    
+    if request.method== 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        records=selectEmail(email)
+        user = Users.query.filter_by(email=email).first()
+        if records==None:
+            flash('Invalid credentials')
+            return render_template('login.html')
+        elif bcrypt.check_password_hash(records[5], password):
+            if records[1]!=2:
+                login_user(user)
+                flash('Logged in successfully.')
+                return redirect(url_for('admin.index'))
+            else:
+                flash('Invalid credentials')
+                return render_template('login.html')
+        else:   
+            flash('Invalid credentials')
+            return render_template('login.html')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def adminLogout():    
+    logout_user()
+    flash('Logged out successfully.')
+    return redirect(url_for('adminLogin'))
+
+@login_manager.user_loader
+def load_user(id):
+    return Users.query.filter_by(userId=id).first()
+    
+admin.add_view(RolesController(Roles, db.session,category="Roles"))
+admin.add_view(UsersController(Users, db.session))
+admin.add_view(Controller(SpecialRights, db.session,category="Roles"))
+admin.add_view(FeedXmlsController(FeedXmls, db.session,category="Feeds"))
+admin.add_view(FeedsController(Feeds, db.session,category="Feeds"))
+admin.add_view(CommentController(Comments, db.session,category="Feeds"))
+admin.add_view(UserLikeController(UserLike, db.session,category="Feeds"))
+admin.add_link(MenuLink(name='Logout',url="/logout"))
 
 if __name__=='__main__':
     app.run(debug=True)
