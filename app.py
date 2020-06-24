@@ -52,7 +52,7 @@ class register(Resource):
             accessToken=access_token
             return {"access_token": access_token}, 201
         else:
-            return {'access_token': 'None'}, 401
+            return {'message': 'email exists'}, 401
 
 # Login
 class login(Resource):
@@ -67,7 +67,7 @@ class login(Resource):
             accessToken=access_token
             return {"access_token": access_token}, 201
         else:   
-            return {'Format': 'False'}, 401
+            return {'message': 'incorrect username or password'}, 401
 
 # Returns category
 class categoryList(Resource):
@@ -91,7 +91,11 @@ class getValuesById(Resource):
         records=returnRecord()
         recordsNoRep=returnNoRepRecord(records)
         result = filtersort(category.capitalize(),filterType,order,time,records,recordsNoRep,key,search)
+        if page == 0:
+            return {"message":"invalid page"}
         if filterType == "likes":
+            if result[0]["Format"] == "False":
+                return {"message":"invalid key"}
             if len(result[0][filterType][int(key)])%10 < 5:
                 pageno=round(len(result[0][filterType][int(key)])/10)+1
             else:
@@ -109,10 +113,12 @@ class getValuesById(Resource):
             else:
                 return {'Format': 'False'} ,400
         else:
+            if result[0]["Format"] == "False":
+                return {"message":"invalid key"}
             if len(result[0][filterType][key.capitalize()])%10 < 5:
                 pageno=round(len(result[0][filterType][key.capitalize()])/10)+1
             else:
-                pageno=round(len(result[0][filterType][key.capitalize()])/10) 
+                pageno=round(len(result[0][filterType][key.capitalize()])/10)
             if pageno == page:
                 i=page
                 lp=len(result[0][filterType][key.capitalize()])%10
@@ -123,7 +129,7 @@ class getValuesById(Resource):
                 for i in range(i*10-10,i*10):
                     feeds.append(result[0][filterType][key.capitalize()][i])
             else:
-                return {'Format': 'False'} ,400
+                return {"message":"invalid page"}
         return feeds, 200
 
 # Get feed values
@@ -136,7 +142,7 @@ class getValues(Resource):
 
 # Handled get and post comments
 class handleComment(Resource):
-    def get(self,feedId=1):
+    def get(self,id):
         if checkFeedId(feedId):
             return getComment(feedId),200
         else:
@@ -149,6 +155,9 @@ class handleComment(Resource):
             return addComment(feedId,userId,comments), 200
         else:
             return {'Format': 'False'}, 400
+    def delete(self,id):
+        comment = commentDelete(id)
+        return comment
 
 # User Template, A new feed by user            
 class userTemplate(Resource):
@@ -278,11 +287,6 @@ class deleteFeedById(Resource):
         else:
             return {'Format': 'False'}, 401
 
-class deleteComment(Resource):
-    def delete(self,commentId):
-        comment = commentDelete(commentId)
-        return comment
-
 class user(Resource):
     def get(self,userId):
         user = getUser(userId)
@@ -302,7 +306,7 @@ class role(Resource):
 class access(Resource):
     def get(self):
         userId = request.get_json()['userId']
-        return getAccess(userId=None)    
+        return getAccess(userId)    
     def post(self):
         userId = request.get_json()['userId']
         colId = request.get_json()['colId']
@@ -326,7 +330,7 @@ api.add_resource(categoryList,'/category')
 api.add_resource(getFeedById,'/feed/<int:feedId>')
 api.add_resource(getValues,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>')
 api.add_resource(getValuesById,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>/<string:search>','/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>')
-api.add_resource(handleComment,'/comment','/comment/<string:feedId>')
+api.add_resource(handleComment,'/comment','/comment/<string:id>')
 api.add_resource(userTemplate,'/usertemplate')
 api.add_resource(editFeed,'/edit/<int:feedId>')
 api.add_resource(incrementLikes,'/incrementLikes/<int:userId>/<int:feedId>')
@@ -334,7 +338,6 @@ api.add_resource(incrementDislikes,'/incrementDislikes/<int:userId>/<int:feedId>
 api.add_resource(addUrl,'/addUrl')
 api.add_resource(deleteUserById,'/users/delete/<int:userId>')
 api.add_resource(deleteFeedById,'/users/deletefeed/<int:feedId>/<int:userId>')
-api.add_resource(deleteComment,'/deletecomment/<int:commentId>')
 api.add_resource(user,'/user/<int:userId>')
 api.add_resource(role,'/role')
 api.add_resource(access,'/access')
