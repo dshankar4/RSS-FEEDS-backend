@@ -1,11 +1,12 @@
+from Db import handleDb,getXml,getFeeds
+from models import feeds
+
 import feedparser
 from pytz import timezone
 import dateutil.parser
 import re
 from datetime import date,datetime
 import dateutil.relativedelta
-from Db import handleDb,getXml,getFeeds
-from models import feeds
 
 #Gets the RSS feeds and split it into a dictionary.
 #feedxmls is a dictionary with category as keys.

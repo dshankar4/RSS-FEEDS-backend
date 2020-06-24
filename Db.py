@@ -330,7 +330,7 @@ def deleteRole(adminId):
 def getAccess(userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
-    c.execute("SELECT * FROM specialRights where userId = (:userId)",{'userId':userId})
+    c.execute("SELECT * FROM specialRights")
     record = c.fetchall()
     conn.commit()
     conn.close()

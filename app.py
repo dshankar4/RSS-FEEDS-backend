@@ -1,21 +1,22 @@
 from models import feeds
 from Db import selectEmail,registerUser,addComment,getComment,feedEdit,feedUrlAdd,addLikes,addDislikes
 from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,newRole,deleteFeed,deleteUser,getSpecialRights, commentDelete,getUser, getAccess, updateAccess,deleteAccess
-from flask import Flask,request,render_template,redirect, url_for,flash
 from data import returnData,filtersort,returnRecord,returnNoRepRecord
+
+from flask import Flask,request,render_template,redirect, url_for,flash
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import  JWTManager,create_access_token
 from flask_restful import Resource, Api
 from datetime import datetime
-import feedparser
-import os
-import re
 from sqlalchemy import event
 from flask_admin import Admin, AdminIndexView
 from flask_admin.menu import MenuLink
 from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager,UserMixin,login_user,current_user,logout_user,login_required
+import feedparser
+import os
+import re
 
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
@@ -25,6 +26,17 @@ app.config['SECRET_KEY']=os.environ.get('SECRET_KEY')
 app.config['JWT_SECRET_KEY']=os.environ.get('JWT_SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///feeds.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+app.config['FLASK_ADMIN_SWATCH'] = 'Darkly' 
+login_manager= LoginManager()
+login_manager.init_app(app)
+    
+class MyAdminIndexView(AdminIndexView):
+    def is_visible(self):
+        return False
+    def is_accessible(self):
+        return current_user.is_authenticated
+        
+admin=Admin(app,name='Admin Panel',template_mode='bootstrap3',index_view=MyAdminIndexView())
 
 accessToken=None
 records=returnRecord()
@@ -52,7 +64,7 @@ class register(Resource):
             accessToken=access_token
             return {"access_token": access_token}, 201
         else:
-            return {'message': 'email exists'}, 401
+            return {'access_token': 'None'}, 401
 
 # Login
 class login(Resource):
@@ -67,7 +79,7 @@ class login(Resource):
             accessToken=access_token
             return {"access_token": access_token}, 201
         else:   
-            return {'message': 'incorrect username or password'}, 401
+            return {'Format': 'False'}, 401
 
 # Returns category
 class categoryList(Resource):
@@ -91,11 +103,7 @@ class getValuesById(Resource):
         records=returnRecord()
         recordsNoRep=returnNoRepRecord(records)
         result = filtersort(category.capitalize(),filterType,order,time,records,recordsNoRep,key,search)
-        if page == 0:
-            return {"message":"invalid page"}
         if filterType == "likes":
-            if result[0]["Format"] == "False":
-                return {"message":"invalid key"}
             if len(result[0][filterType][int(key)])%10 < 5:
                 pageno=round(len(result[0][filterType][int(key)])/10)+1
             else:
@@ -113,12 +121,10 @@ class getValuesById(Resource):
             else:
                 return {'Format': 'False'} ,400
         else:
-            if result[0]["Format"] == "False":
-                return {"message":"invalid key"}
             if len(result[0][filterType][key.capitalize()])%10 < 5:
                 pageno=round(len(result[0][filterType][key.capitalize()])/10)+1
             else:
-                pageno=round(len(result[0][filterType][key.capitalize()])/10)
+                pageno=round(len(result[0][filterType][key.capitalize()])/10) 
             if pageno == page:
                 i=page
                 lp=len(result[0][filterType][key.capitalize()])%10
@@ -129,7 +135,7 @@ class getValuesById(Resource):
                 for i in range(i*10-10,i*10):
                     feeds.append(result[0][filterType][key.capitalize()][i])
             else:
-                return {"message":"invalid page"}
+                return {'Format': 'False'} ,400
         return feeds, 200
 
 # Get feed values
@@ -142,7 +148,7 @@ class getValues(Resource):
 
 # Handled get and post comments
 class handleComment(Resource):
-    def get(self,id):
+    def get(self,feedId=1):
         if checkFeedId(feedId):
             return getComment(feedId),200
         else:
@@ -155,9 +161,6 @@ class handleComment(Resource):
             return addComment(feedId,userId,comments), 200
         else:
             return {'Format': 'False'}, 400
-    def delete(self,id):
-        comment = commentDelete(id)
-        return comment
 
 # User Template, A new feed by user            
 class userTemplate(Resource):
@@ -287,6 +290,11 @@ class deleteFeedById(Resource):
         else:
             return {'Format': 'False'}, 401
 
+class deleteComment(Resource):
+    def delete(self,commentId):
+        comment = commentDelete(commentId)
+        return comment
+
 class user(Resource):
     def get(self,userId):
         user = getUser(userId)
@@ -306,7 +314,7 @@ class role(Resource):
 class access(Resource):
     def get(self):
         userId = request.get_json()['userId']
-        return getAccess(userId)    
+        return getAccess(userId=None)    
     def post(self):
         userId = request.get_json()['userId']
         colId = request.get_json()['colId']
@@ -330,7 +338,7 @@ api.add_resource(categoryList,'/category')
 api.add_resource(getFeedById,'/feed/<int:feedId>')
 api.add_resource(getValues,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>')
 api.add_resource(getValuesById,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>/<string:search>','/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>')
-api.add_resource(handleComment,'/comment','/comment/<string:id>')
+api.add_resource(handleComment,'/comment','/comment/<string:feedId>')
 api.add_resource(userTemplate,'/usertemplate')
 api.add_resource(editFeed,'/edit/<int:feedId>')
 api.add_resource(incrementLikes,'/incrementLikes/<int:userId>/<int:feedId>')
@@ -338,9 +346,13 @@ api.add_resource(incrementDislikes,'/incrementDislikes/<int:userId>/<int:feedId>
 api.add_resource(addUrl,'/addUrl')
 api.add_resource(deleteUserById,'/users/delete/<int:userId>')
 api.add_resource(deleteFeedById,'/users/deletefeed/<int:feedId>/<int:userId>')
+api.add_resource(deleteComment,'/deletecomment/<int:commentId>')
 api.add_resource(user,'/user/<int:userId>')
 api.add_resource(role,'/role')
 api.add_resource(access,'/access')
+
+#Admin Panel
+
 db= SQLAlchemy(app)
 
 class FeedXmls(db.Model):
@@ -425,14 +437,9 @@ class Controllers(ModelView):
     def inaccessible_callback(self,name,**kwargs):
         return redirect(url_for('adminLogin'))
 
-class MyAdminIndexView(AdminIndexView):
-    def is_visible(self):
-        return False
-    def is_accessible(self):
-        return current_user.is_authenticated
-        
+
 class RolesController(Controllers):
-    form_columns=['adminId','role']   
+    form_columns=['role']   
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -524,7 +531,7 @@ class FeedsController(Controllers):
         return False
 
 class UserLikeController(Controllers):
-    form_columns=['users','feedId','like','dislike']
+    form_columns=['users','feeds','like','dislike']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -555,7 +562,7 @@ class UserLikeController(Controllers):
         
 
 class CommentController(Controllers):
-    form_columns=['users','feedId','comment']
+    form_columns=['users','feeds','comment']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -586,6 +593,7 @@ class CommentController(Controllers):
 
 
 class FeedXmlsController(Controllers):
+    column_filters = ['category']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -649,14 +657,12 @@ def hashPass(target,value,oldvalue,initiator):
         return bcrypt.generate_password_hash(value).decode('utf-8')
     return value
     
-app.config['FLASK_ADMIN_SWATCH'] = 'Darkly' 
-admin=Admin(app,name='Admin Panel',template_mode='bootstrap3',index_view=MyAdminIndexView())
-login_manager= LoginManager()
-login_manager.init_app(app)
-login_manager.login_view= 'login'
+@login_manager.user_loader
+def load_user(id):
+    return Users.query.filter_by(userId=id).first()
 
 
-@app.route('/login',methods=['POST','GET'])
+@app.route('/',methods=['POST','GET'])
 def adminLogin():    
     if request.method== 'POST':
         email = request.form.get('email')
@@ -686,10 +692,7 @@ def adminLogout():
     flash('Logged out successfully.')
     return redirect(url_for('adminLogin'))
 
-@login_manager.user_loader
-def load_user(id):
-    return Users.query.filter_by(userId=id).first()
-    
+
 admin.add_view(RolesController(Roles, db.session,category="Roles"))
 admin.add_view(UsersController(Users, db.session))
 admin.add_view(Controller(SpecialRights, db.session,category="Roles"))
