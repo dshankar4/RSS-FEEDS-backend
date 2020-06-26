@@ -57,14 +57,14 @@ class register(Resource):
             return any(char.isdigit() for char in inputString)
         regex = '^[a-z0-9]+[\._]?[a-z0-9]+[@]\w+[.]\w+$'
         if(bool(hasNumbers(first_name))==True or bool(hasNumbers(last_name))==True or len(password)<8 or bool(re.search(regex,email))==False ):
-            return {'Format': 'False'}, 401
+            return {'message':'Bad Request','Format': 'False'}, 401
         if records==None:
             registerUser(first_name,last_name,email,password,'user')
             access_token = create_access_token(identity = {'email': email})
             accessToken=access_token
-            return {"access_token": access_token}, 201
+            return {"access_token": access_token,'message':'registered successfully','Format': 'True'}, 201
         else:
-            return {'access_token': 'None'}, 401
+            return {'message':'user doesnt exist','Format': 'Fasle'}, 401
 
 # Login
 class login(Resource):
@@ -73,13 +73,13 @@ class login(Resource):
         password = request.get_json()['password']
         records=selectEmail(email)
         if records==None:
-            return {'Format': 'False'}, 401    
+            return {'message':'Bad Request','Format': 'False'}, 401    
         elif bcrypt.check_password_hash(records[5], password):
             access_token = create_access_token(identity = {'email': email})
             accessToken=access_token
-            return {"access_token": access_token}, 201
+            return {"access_token": access_token,'message':'loggedin successfully','Format': 'True'}, 201
         else:   
-            return {'Format': 'False'}, 401
+            return {'message':'invalid username or password','Format': 'False'}, 401
 
 # Returns category
 class categoryList(Resource):
