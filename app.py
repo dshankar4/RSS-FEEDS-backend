@@ -64,7 +64,7 @@ class register(Resource):
             accessToken=access_token
             return {"access_token": access_token,'message':'registered successfully','Format': 'True'}, 201
         else:
-            return {'message':'user doesnt exist','Format': 'Fasle'}, 401
+            return {'message':'user exist','Format': 'Fasle'}, 401
 
 # Login
 class login(Resource):
@@ -84,7 +84,7 @@ class login(Resource):
 # Returns category
 class categoryList(Resource):
     def get(self):
-        return {'category': category}, 200
+        return {'category': category,'Format':'True'}, 200
 
 # Get Feed by passing id
 class getFeedById(Resource):
@@ -111,7 +111,6 @@ class getValuesById(Resource):
             if pageno == page:
                 i=page
                 lp=len(result[0][filterType][int(key)])-((round(len(result[0][filterType][int(key)])/10)))*10
-                print("feeds2",lp)
                 for i in range(i*10-10,(i*10-10)+lp):
                     feeds.append(result[0][filterType][int(key)][i])
             elif pageno > page: 
@@ -119,7 +118,7 @@ class getValuesById(Resource):
                 for i in range(i*10-10,i*10):
                     feeds.append(result[0][filterType][int(key)][i])
             else:
-                return {'Format': 'False'} ,400
+                return {'message':'Invalid key','Format': 'False'} ,400
         else:
             if len(result[0][filterType][key.capitalize()])%10 < 5:
                 pageno=round(len(result[0][filterType][key.capitalize()])/10)+1
@@ -135,8 +134,8 @@ class getValuesById(Resource):
                 for i in range(i*10-10,i*10):
                     feeds.append(result[0][filterType][key.capitalize()][i])
             else:
-                return {'Format': 'False'} ,400
-        return feeds, 200
+                return {'message':'Invalid key','Format': 'False'} ,400
+        return {'feed':feeds,'format':'True'}, 200
 
 # Get feed values
 class getValues(Resource):
@@ -148,11 +147,12 @@ class getValues(Resource):
 
 # Handled get and post comments
 class handleComment(Resource):
-    def get(self,feedId=1):
+    def get(self):
+        feedId = request.get_json()['feedId']
         if checkFeedId(feedId):
             return getComment(feedId),200
         else:
-            return {'Format': 'False'}, 400
+            return {'message':'invalid feedId','Format': 'False'}, 400
     def post(self):
         feedId = request.get_json()['feedId']
         userId = request.get_json()['userId']
@@ -160,7 +160,13 @@ class handleComment(Resource):
         if checkFeedId(feedId) and checkUserId(userId):
             return addComment(feedId,userId,comments), 200
         else:
-            return {'Format': 'False'}, 400
+            return {'message':'feedid or userid doesnt exist','Format': 'False'}, 400
+    
+    def delete(self):
+        commentId = request.get_json()['commentId']
+        comment = commentDelete(commentId)
+        return comment
+
 
 # User Template, A new feed by user            
 class userTemplate(Resource):
@@ -185,16 +191,16 @@ class userTemplate(Resource):
         feedsList.append(feeds(feedTitle,summary,time,imageUrl,category,author,link,dispTime,logo,userId))
         
         if len(feedTitle)==0 or len(summary)==0 or len(author)==0 or checkUserId(userId)==0:
-            return {'Format':'False'}, 400
+            return {'message':'Bad Request','Format':'False'}, 400
         if len(imageUrl)==0:
             imageUrl='https://www.zylogelastocomp.com/wp-content/uploads/2019/03/notfound.png'
         if len(category)==0:
             category='Headline'
         value=getFeeds(feedsList,1)
         if value==0:
-            return {'Format':'False'}, 400
+            return {'message':'Bad Request','Format':'False'}, 400
         else:
-            return {'Format':'True'}, 200
+            return {'message':'Feed added','Format':'True'}, 200
 
 # Edit a feed
 class  editFeed(Resource):
@@ -207,9 +213,9 @@ class  editFeed(Resource):
         fId = checkFeedId(feedId)
         if fId:
             records=feedEdit(title,summary,category,author,link,feedId)
-            return {'Format': 'True'}, 200
+            return {'message':'Feed edited','Format': 'True'}, 200
         else:
-            return {'Format': 'False'}    
+            return {'message':'Bad Request','Format': 'False'}    
 
 # Admin
 # Adding a new feedXml
@@ -222,7 +228,7 @@ class addUrl(Resource):
             if len(parsed.feed)!=0:
                 feedUrl = feedUrlAdd(url,categoryUrl)
                 return feedUrl
-        return {'Format': 'False'}
+        return {'message':'category not found','Format': 'False'}
 
 # Admin         
 # Adding a new role by admin
@@ -238,9 +244,9 @@ class adminRegister(Resource):
             registerUser(first_name,last_name,email,password,role)
             access_token = create_access_token(identity = {'email': email})
             accessToken=access_token
-            return {"access_token": access_token}, 201
+            return {"access_token": access_token,'message':'registered successfully','Format': 'True'}, 201
         else:
-            return {'Format': 'False'}, 401
+            return {'message':'user exist','Format': 'Fasle'}, 401
 
 # Increase dislikes
 class incrementDislikes(Resource):
@@ -250,11 +256,11 @@ class incrementDislikes(Resource):
             fId = checkFeedId(feedId)
             if fId:
                 disLikes = addDislikes(userId,feedId)
-                return {'Format': 'True'}, 200              
+                return {'message':'post disliked','Format': 'True'}, 200              
             else:
-                return {'Format': 'False'}, 400
+                return {'message':'feedid doesnt exist','Format': 'False'}, 400
         else:
-            return {'Format': 'False'}, 400
+            return {'message':'userid doesnt exist','Format': 'False'}, 400
 
 # Increase likes
 class incrementLikes(Resource):
@@ -264,11 +270,11 @@ class incrementLikes(Resource):
             fId = checkFeedId(feedId)
             if fId:
                 likes = addLikes(userId,feedId)
-                return {'Format': 'True'}, 200              
+                return {'message':'post liked','Format': 'True'}, 200              
             else:
-                return {'Format': 'False'}, 400
+                return {'message':'feedid doesnt exist','Format': 'False'}, 400
         else:
-            return {'Format': 'False'}, 400
+            return {'message':'userid doesnt exist','Format': 'False'}, 400
 
 # Admin
 # Delete User
@@ -276,9 +282,9 @@ class deleteUserById(Resource):
     def get(self,userId):
         if checkUserId(userId):
             deleteUser(userId)
-            return {'Format': 'True'}, 200              
+            return {'message':'user deleted','Format': 'True'}, 200              
         else:
-            return {'Format': 'False'}, 401
+            return {'message':'Bad Request','Format': 'False'}, 401
 
 # Admin
 # Delete Feed
@@ -286,14 +292,9 @@ class deleteFeedById(Resource):
     def get(self,feedId,userId):
         if checkFeedId(feedId) and checkUserId(userId):
             deleteFeed(feedId,userId)
-            return {'Format': 'True'}, 200              
+            return {'message':'feed deleted','Format': 'True'}, 200              
         else:
-            return {'Format': 'False'}, 401
-
-class deleteComment(Resource):
-    def delete(self,commentId):
-        comment = commentDelete(commentId)
-        return comment
+            return {'message':'Bad Request','Format': 'False'}, 401
 
 class user(Resource):
     def get(self,userId):
@@ -338,7 +339,7 @@ api.add_resource(categoryList,'/category')
 api.add_resource(getFeedById,'/feed/<int:feedId>')
 api.add_resource(getValues,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>')
 api.add_resource(getValuesById,'/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>/<string:search>','/types/<string:category>/<string:filterType>/<string:order>/<string:time>/<int:page>/<string:key>')
-api.add_resource(handleComment,'/comment','/comment/<string:feedId>')
+api.add_resource(handleComment,'/comment')
 api.add_resource(userTemplate,'/usertemplate')
 api.add_resource(editFeed,'/edit/<int:feedId>')
 api.add_resource(incrementLikes,'/incrementLikes/<int:userId>/<int:feedId>')
@@ -346,7 +347,6 @@ api.add_resource(incrementDislikes,'/incrementDislikes/<int:userId>/<int:feedId>
 api.add_resource(addUrl,'/addUrl')
 api.add_resource(deleteUserById,'/users/delete/<int:userId>')
 api.add_resource(deleteFeedById,'/users/deletefeed/<int:feedId>/<int:userId>')
-api.add_resource(deleteComment,'/deletecomment/<int:commentId>')
 api.add_resource(user,'/user/<int:userId>')
 api.add_resource(role,'/role')
 api.add_resource(access,'/access')

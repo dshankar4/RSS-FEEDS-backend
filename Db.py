@@ -178,7 +178,7 @@ def addComment(feedId,userId,comment):
     c.execute("INSERT INTO comments (userId,feedId,comment) VALUES (:userId,:feedId,:comment)",{'userId':userId,'feedId':feedId,'comment':comment})
     conn.commit()
     conn.close()
-    return {'post': 'posted'}
+    return {'message':'comment posted','format':'True'}
 
 #Get comments for the feedId
 def getComment(feedId):
@@ -194,7 +194,7 @@ def getComment(feedId):
     for rows in comments:
         returnDict['values'].append({'userId':rows[0],'comment':rows[2]})
     if len(returnDict['values'])==0:
-        return {'Format': 'False'}
+        return {'message':'invalid commentId','Format': 'False'}
     return returnDict
 
 #Add feedUrl and category
@@ -205,12 +205,12 @@ def feedUrlAdd(url,newCategory):
     if record:
         conn.commit()
         conn.close()
-        return {'Format': 'False'}
+        return {'message':'Bad Request','Format': 'False'}
     c.execute("INSERT INTO feedXmls (feedXml,category) VALUES (:url,:category)",{'url':url,'category':newCategory})
     records = c.fetchone()
     conn.commit()
     conn.close()
-    return {'Format': 'True'}
+    return {'message':'url added','Format': 'True'}
 
 def feedEdit(title,summary,category,author,link,feedId):
     conn = sqlite3.connect('Feeds.db')
@@ -294,7 +294,7 @@ def newRole(id,role):
     c.execute("INSERT INTO roles (adminId,role) VALUES (:adminId,:role)",{'adminId':id,'role':role})
     conn.commit()
     conn.close()
-    return {'Format':'True'}, 200
+    return {'message':'role added','Format':'True'}, 200
 
 #To display all roles
 def getRole():
@@ -309,9 +309,9 @@ def getRole():
         rolesDict['Values']=list()
         for rows in record:
             rolesDict['Values'].append({'adminId':rows[0],'Role':rows[1]})
-        return rolesDict, 200
+        return {'roles':rolesDict,'format':'True'}, 200
     else:
-        return {'Format':'False'}, 401
+        return {'message':'role doesnt exist','Format':'False'}, 401
 
 #To delete a role
 def deleteRole(adminId):
@@ -339,9 +339,9 @@ def getAccess(userId):
         rolesDict['Values']=list()
         for rows in record:
             rolesDict['Values'].append({'userId':rows[1],'cFeed':rows[2],'rFeed':rows[3],'uFeed':rows[4],'dFeed':rows[5],'rowsTable':rows[6],'usersTable':rows[7],'feedsTable':rows[8],'userLikeTable':rows[9],'commentTable':rows[10],'feedXmlsTable':rows[11]})
-        return rolesDict, 200
+        return {'access':rolesDict,'format':'True'}, 200
     else:
-        return {'Format':'False'}, 401
+        return {'message':'no access right','Format':'False'}, 401
 
 def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
     conn = sqlite3.connect('Feeds.db')
@@ -352,12 +352,12 @@ def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feed
         c.execute("UPDATE specialRights SET cFeed = (:cFeed), rFeed = (:rFeed), uFeed = (:uFeed), dFeed = (:dFeed), rolesTable = (:rolesTable), usersTable = (:usersTable), feedsTable = (:feedsTable), userLikeTable = (:userLikeTable), commentTable = (:commentTable), feedXmlsTable = (:feedXmlsTable) WHERE colId = (:id)",{'cFeed':cFeed,'rFeed':rFeed,'uFeed':uFeed,'dFeed':dFeed,'rolesTable':rolesTable,'usersTable':usersTable,'feedsTable':feedsTable,'userLikeTable':userLikeTable,'commentTable':commentTable,'feedXmlsTable':feedXmlsTable,'id':colId})
         conn.commit()
         conn.close()
-        return {"message":"updated"}
+        return {"message":"updated",'format':'True'}
     else:
         c.execute("INSERT into specialRights (cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable,userId,colId) VALUES (:cFeed,:rFeed,:uFeed,:dFeed,:rolesTable,:usersTable,:feedsTable,:userLikeTable,:commentTable,:feedXmlsTable,:userId,:colId) ",{'cFeed':cFeed,'rFeed':rFeed,'uFeed':uFeed,'dFeed':dFeed,'rolesTable':rolesTable,'usersTable':usersTable,'feedsTable':feedsTable,'userLikeTable':userLikeTable,'commentTable':commentTable,'feedXmlsTable':feedXmlsTable,'userId':userId,'colId':colId})
         conn.commit()
         conn.close()
-        return {"message":"new role"}
+        return {"message":"new role",'fomrat':'True'}
 
 def deleteAccess(id):
     conn = sqlite3.connect('Feeds.db')
@@ -404,9 +404,9 @@ def commentDelete(commentId):
         c.execute("DELETE FROM comments where commentId = (:commentId)",{'commentId':commentId})
         conn.commit()
         conn.close()
-        return {"message":"comment deleted"}
+        return {"message":"comment deleted",'format':'True'}
     else:
-        return {"message":"comment doesn't exist"}
+        return {"message":"comment doesn't exist",'format':'False'}
 
 def getUser(userId):
     conn = sqlite3.connect('Feeds.db')
@@ -419,6 +419,6 @@ def getUser(userId):
             records.append({'id':feed[0],'feedTitle':feed[1],'summary':feed[2],'dispTime':feed[3],'imgUrl':feed[4],'category':feed[5],'author':feed[6],'link':feed[7],'like':feed[8],'dislike':feed[9],'time':feed[10],'logo':feed[11],'userId':feed[12]})
         conn.commit()
         conn.close()
-        return records
+        return {'feeds':records,'format':'True'}
     else:
-        return {"message":"no feeds"}
+        return {"message":"no feeds",'format':'False'}
