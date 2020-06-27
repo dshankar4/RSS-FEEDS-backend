@@ -1,7 +1,6 @@
 from flask import flash,Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_bcrypt import Bcrypt
-from __main__ import app,login_manager,admin
+from __main__ import app,login_manager,admin,bcrypt
 from sqlalchemy import event
 from flask_admin import Admin, AdminIndexView
 from flask_admin.menu import MenuLink
@@ -43,8 +42,8 @@ class Users(db.Model,UserMixin):
     email=db.Column('email',db.String,unique=True)
     password=db.Column('password',db.String)
     
-    def __init__(first_name,last_name,email,password,adminId):
-        self.adminId=exist
+    def __init__(self,first_name,last_name,email,password,adminId):
+        self.adminId=adminId
         self.firstname=first_name
         self.lastname=last_name
         self.email=email
@@ -58,7 +57,7 @@ class Feeds(db.Model):
     feedId=db.Column('feedId',db.Integer,primary_key=True)
     userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
     users = db.relationship("Users", backref='userId_feeds')
-    feedTitle=db.Column('feedTitle',db.String,unique=True)
+    feedTitle=db.Column('feedTitle',db.String)
     summary=db.Column('summary',db.String)
     time=db.Column('time',db.String)
     imageUrl=db.Column('imageUrl',db.String)
@@ -148,110 +147,26 @@ db.create_all()
 
 # handleDb to Handle initial Db operations
 def handleDb():
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    # Create roles table
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='roles' """)
-    if c.fetchone()[0]!=1 : 
-        c.execute("""CREATE TABLE roles (adminId INTEGER PRIMARY KEY,
-                                        role TEXT)""")
-        conn.commit()
-        c.execute("INSERT INTO roles VALUES (:adminId,:role)",{'adminId':1,'role':'admin'})
-        c.execute("INSERT INTO roles VALUES (:adminId,:role)",{'adminId':2,'role':'user'})
-        conn.commit()
-        
-    # Create users table
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='users' """)
-    if c.fetchone()[0]!=1 : 
-        c.execute("""CREATE TABLE users (userId INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        adminId INTEGER,
-                                        firstname TEXT,
-                                        lastname TEXT,
-                                        email TEXT,
-                                        password TEXT,
-                                        FOREIGN KEY(adminId) REFERENCES roles(adminId))""")  
-        conn.commit()
-        bcrypt = Bcrypt()
-        c.execute("INSERT INTO users (adminId,firstname,lastname,email,password) VALUES (:adminId,:firstname,:lastname,:email,:password)",{'adminId':1,'firstname':'admin','lastname':'admin','email':'admin@admin.in','password':bcrypt.generate_password_hash('admin').decode('utf-8')})
-        c.execute("INSERT INTO users (adminId,firstname,lastname,email,password) VALUES (:adminId,:firstname,:lastname,:email,:password)",{'adminId':2,'firstname':'user','lastname':'user','email':'user@user.in','password':bcrypt.generate_password_hash('user').decode('utf-8')})
-        conn.commit()
-        
-    # Create specialRights table
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='specialRights' """)
-    if c.fetchone()[0]!=1 : 
-        c.execute("""CREATE TABLE specialRights (colId INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        userId INTEGER,
-                                        cFeed INTEGER,
-                                        rFeed INTEGER,
-                                        uFeed INTEGER,
-                                        dFeed INTEGER,
-                                        rolesTable INTEGER,
-                                        usersTable INTEGER,
-                                        feedsTable INTEGER,
-                                        userLikeTable INTEGER,
-                                        commentTable INTEGER,
-                                        feedXmlsTable INTEGER,
-                                        FOREIGN KEY(userId) REFERENCES users(userId))""")
-        conn.commit()
-        c.execute("INSERT INTO specialRights(userId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable) VALUES (:userId,:cFeed,:rFeed,:uFeed,:dFeed,:rolesTable,:usersTable,:feedsTable,:userLikeTable,:commentTable,:feedXmlsTable)",{'userId':1,'cFeed':1,'rFeed':1,'uFeed':1,'dFeed':1,'rolesTable':1,'usersTable':1,'feedsTable':1,'userLikeTable':1,'commentTable':1,'feedXmlsTable':1})
-
-    # Create feeds table 
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='feeds' """)
-    if c.fetchone()[0]!=1 : 
-        c.execute("""CREATE TABLE feeds (feedId INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        feedTitle TEXT,
-                                        summary TEXT,
-                                        time TEXT,
-                                        imageUrl TEXT,
-                                        category TEXT,
-                                        author TEXT,
-                                        link TEXT,
-                                        likes INTEGER,
-                                        dislikes INTEGER,
-                                        dispTime TEXT,
-                                        logo TEXT,
-                                        userId INTEGER,
-                                        FOREIGN KEY(userId) REFERENCES users(userId))""")
-        conn.commit()
-    # Create userLike table
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='userLike' """)
-    if c.fetchone()[0]!=1 : 
-        c.execute("""CREATE TABLE userLike (userId TEXT,
-                                            feedId INTEGER,
-                                            like INTEGER,
-                                            dislike INTEGER,
-                                            likeId INTEGER PRIMARY KEY AUTOINCREMENT,
-                                            FOREIGN KEY(userId) REFERENCES users(userId),
-                                            FOREIGN KEY(FeedId) REFERENCES feeds(feedId))""")
-        conn.commit()
-    # Create comments table
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='comments' """)
-    if c.fetchone()[0]!=1 : 
-        c.execute("""CREATE TABLE comments (userId TEXT,
-                                            feedId INTEGER,
-                                            comment TEXT,
-                                            commentId INTEGER PRIMARY KEY AUTOINCREMENT,
-                                            FOREIGN KEY(userId) REFERENCES users(userId),
-                                            FOREIGN KEY(FeedId) REFERENCES feeds(feedId))""")
-        conn.commit()
-
-    # Create feedXmlS table 
-    c.execute(""" SELECT count(name) FROM sqlite_master WHERE type='table' AND name='feedXmls' """)
-    if c.fetchone()[0]!=1 :
-        c.execute("""CREATE TABLE feedXmls (feedXmlId INTEGER PRIMARY KEY AUTOINCREMENT,
-                                            feedXml TEXT,
-                                            category TEXT)""")
-        conn.commit()
-        c.execute("INSERT INTO feedXmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/topnews/rssfeed.xml','category':'Headline'})
-        c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/india/rssfeed.xml','category':'India'})
-        c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/sports/rssfeed.xml','category':'Sports'})
-        c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/tech/rssfeed.xml','category':'Tech'})
-        c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/education/rssfeed.xml','category':'Education'})
-        c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/business/rssfeed.xml','category':'Business'})
-        c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/lifestyle/rssfeed.xml','category':'Lifestyle'})
-        conn.commit()
-    conn.close()
-    
+    if not Roles.query.all():
+        db.session.add(Roles('admin'))
+        db.session.commit()
+        db.session.add(Roles('user'))
+        db.session.commit()
+    if not Users.query.all():
+        db.session.add(Users('admin','admin','admin@admin.in',bcrypt.generate_password_hash('admin').decode('utf-8'),1))
+        db.session.commit()
+        db.session.add(Users('user','user','user@user.in',bcrypt.generate_password_hash('user').decode('utf-8'),2))
+        db.session.commit()
+    if not SpecialRights.query.all():
+        db.session.add(SpecialRights(1,True,True,True,True,True,True,True,True,True,True))
+        db.session.commit()
+    if not FeedXmls.query.all():
+        db.session.add(FeedXmls('https://www.hindustantimes.com/rss/topnews/rssfeed.xml','Headline'))
+        db.session.add(FeedXmls('https://www.hindustantimes.com/rss/india/rssfeed.xml','India'))
+        db.session.add(FeedXmls('https://www.hindustantimes.com/rss/tech/rssfeed.xml','Tech'))
+        db.session.add(FeedXmls('https://www.hindustantimes.com/rss/education/rssfeed.xml','Education'))
+        db.session.add(FeedXmls('https://www.hindustantimes.com/rss/business/rssfeed.xml','Business'))
+        db.session.commit()
 
 
 #Register user    
@@ -346,45 +261,50 @@ def feedEdit(title,summary,category,author,link,feedId):
     rows.link=link
     db.session.commit()
     return [rows.feedId,rows.feedTitle,rows.summary,rows.time,rows.imageUrl,rows.category,rows.author,rows.link,rows.likes,rows.dislikes,rows.dispTime,rows.logo,rows.userId]
+
 #likes
 def addLikes(userId,feedId):
     records=UserLike.query.filter_by(feedId=feedId,userId=userId).first()
     if records:
-        if records.like == 0 and records.dislike == 1:
-            records.like=1
-            records.dislike=0
+        if bool(records.like) == False and bool(records.dislike) == True:
+            records.like=True
+            records.dislike=False
+            db.session.commit()
             record=Feeds.query.filter_by(feedId=feedId).first()
             record.likes+=1
-            record.dislike-=1
+            record.dislikes-=1
+            db.session.commit()
         else:
-            return {"message":"liked before itself"}
+            return False
     else:
         db.session.add(UserLike(userId,feedId,1,0))
         record=Feeds.query.filter_by(feedId=feedId).first()
         record.likes+=1
+        db.session.commit()
     
-    db.session.commit()
-    return [records.userId,records.feedId,records.like,records.dislike]
+    return True
         
 #dislikes
 def addDislikes(userId,feedId):
     records=UserLike.query.filter_by(feedId=feedId,userId=userId).first()    
     if records:
-        if records.like == 1 and records.dislike == 0:
-                records.like=0
-                records.dislike=1
+        if bool(records.like) == True and bool(records.dislike) == False:
+                records.like=False
+                records.dislike=True
+                db.session.commit()
                 record=Feeds.query.filter_by(feedId=feedId).first()
                 record.likes-=1
-                record.dislike+=1
+                record.dislikes+=1
+                db.session.commit()
         else:
-            return {"message":"disliked before itself"}
+            return False
     else:
         db.session.add(UserLike(userId,feedId,0,1))
         record=Feeds.query.filter_by(feedId=feedId).first()
         record.dislikes+=1
+        db.session.commit()
     
-    db.session.commit()
-    return [records.userId,records.feedId,records.like,records.dislike]
+    return True
 
 #check feed Id    
 def checkFeedId(feedId):
@@ -442,8 +362,7 @@ def getAccess(userId):
     rights=SpecialRights.query.all()
     record=[]
     for rows in rights:
-        record.append((rows.userId,rows.cFeed,rows.rFeed,rows.uFeed,rows.dFeed,rows.rolesTable,rows.usersTable,rows.feedsTable,rows.userLikeTable,rows.commentTable,rows.feedXmlsTable))    
-    c.execute("SELECT * FROM specialRights")
+        record.append((rows.colId,rows.userId,rows.cFeed,rows.rFeed,rows.uFeed,rows.dFeed,rows.rolesTable,rows.usersTable,rows.feedsTable,rows.userLikeTable,rows.commentTable,rows.feedXmlsTable))    
     rolesDict={}
     if record:
         rolesDict['Values']=list()
@@ -529,13 +448,20 @@ def getUser(userId):
     if feeds:
         records=[]
         for rows in feeds:         
-            records.append({'id':rows.feedId,'feedTitle':rows.feedTitle,'summary':rows.summary,'dispTime':rows.dispTime,'imgUrl':feeds.imgUrl,'category':feeds.category,'author':feeds.author,'link':feeds.link,'like':feeds.like,'dislike':feeds.dislike,'time':feeds.time,'logo':feeds.logo,'userId':feeds.userId})
+            records.append({'feedId':rows.feedId,'feedTitle':rows.feedTitle,'summary':rows.summary,'dispTime':rows.dispTime,'imgUrl':rows.imageUrl,'category':rows.category,'author':rows.author,'link':rows.link,'like':rows.likes,'dislike':rows.dislikes,'time':rows.time,'logo':rows.logo,'userId':rows.userId})
         conn.commit()
         conn.close()
         return {'feeds':records,'format':'True'}
     else:
         return {"message":"no feeds",'format':'False'}
 
+#get post
+def getPost(feedId):
+    feeds=Feeds.query.filter_by(feedId=feedId).first()
+    if feeds:
+        return [{'feedId':feeds.feedId,'feedTitle':feeds.feedTitle,'summary':feeds.summary,'dispTime':feeds.dispTime,'imgUrl':feeds.imageUrl,'category':feeds.category,'author':feeds.author,'link':feeds.link,'like':feeds.likes,'dislike':feeds.dislikes,'time':feeds.time,'logo':feeds.logo,'userId':feeds.userId}]
+    else:
+        return {"message":"no feeds",'format':'False'}
 
 
 

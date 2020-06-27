@@ -45,7 +45,7 @@ class RolesController(Controllers):
         return False
 
 class UsersController(Controllers):
-    form_columns=['roles','firstname','lastname','email','password','userId']
+    form_columns=['roles','firstname','lastname','email','password']
     def is_accessible(self):
         records=getSpecialRights(current_user.userId)
         for record in records:
@@ -246,7 +246,7 @@ def adminLogin():
         records=selectEmail(email)
         user = Users.query.filter_by(email=email).first()
         if records==None:
-            flash('Invalid credentials')
+            flash('Invaliddd credentials')
             return render_template('login.html')
         elif bcrypt.check_password_hash(records[5], password):
             if records[1]!=2:

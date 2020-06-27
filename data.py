@@ -77,8 +77,6 @@ def returnNoRepRecord(records):
             records.remove(rows)
     return records
     
-
-
 # Collects all the data as class of object and converts it into list of dictionary .Collects the category in a seperate variable.
 # returns the feeds and category to app.py 
 # Since a single post can be in multiple categories. I filter the unique feeds in allFeedsnorep which has no repititive data.
@@ -87,7 +85,7 @@ def returnData(records):
     allFeeds=[]
     category=[]
     for rows in records:
-        allFeeds.append({'unikey':rows[0],'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]})
+        allFeeds.append({'feedId':rows[0],'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]})
         if rows[5] not in category:
             category.append(rows[5])
     
@@ -165,15 +163,15 @@ def filtersort(category,filterType,order,time,records,recordsNoRep,key=None,sear
                             if filterType=='likes' and rows[8]==int(key):
                                 if rows[8] not in filterFeed['likes']:
                                     filterFeed['likes'][rows[8]]=list()
-                                filterFeed['likes'][rows[8]].append({'unikey':rows[0],'id':0,'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]}) 
+                                filterFeed['likes'][rows[8]].append({'feedId':rows[0],'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]}) 
                             elif filterType=='titles' and rows[1].upper()[0]==key.capitalize():
                                 if rows[1].upper()[0] not in filterFeed['titles']:
                                     filterFeed['titles'][rows[1].upper()[0]]=list()
-                                filterFeed['titles'][rows[1].upper()[0]].append({'unikey':rows[0],'id':0,'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]})                
+                                filterFeed['titles'][rows[1].upper()[0]].append({'feedId':rows[0],'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]})                
                             elif filterType=='dates' and rows[3][:10]==key:
                                 if rows[3][:10] not in filterFeed['dates']:
                                     filterFeed['dates'][rows[3][:10]]=list()
-                                filterFeed['dates'][rows[3][:10]].append({'unikey':rows[0],'id':0,'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]})                
+                                filterFeed['dates'][rows[3][:10]].append({'feedId':rows[0],'feedTitle':rows[1],'summary':rows[2],'time':rows[3],'imageUrl':rows[4],'category':rows[5],'author':rows[6],'link':rows[7],'like':rows[8],'dislike':rows[9],'dispTime':rows[10],'logo':rows[11],'userId':rows[12]})                
 
     if key==None:
         if order=='up':
