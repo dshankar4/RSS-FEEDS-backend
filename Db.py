@@ -253,55 +253,48 @@ def handleDb():
         conn.commit()
     conn.close()
     
-#rp
+
 #Register user    
 def registerUser(first_name,last_name,email,password,roles):
     exist=Roles.query.filter_by(role=roles).first()    
     if exist:
         db.session.add(Users(first_name,last_name,email,password,exist.adminId))
     
-#rp
+
 #getXml function fetches all the RSS feeds from the database.
 def getXml():
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM feedXmls")
-    records = c.fetchall()
-    conn.commit()
-    conn.close()
+    feeds_exist=FeedXmls.query.all()
+    records=[]
+    for rows in feeds_exist:
+        records.append((rows.feedXmlId,rows.category))
     return records
 
-#rp
+
 #Updates the database with new feeds.Handles multiple copies in the database if any
 def getFeeds(allFeeds,userInput=0):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
     for feeds in allFeeds:
-        c.execute("SELECT * FROM feeds WHERE feedTitle = ?",(feeds.feedTitle,))
-        result=c.fetchone()
+        exist=Feeds.query.filter_by(feedTitle=feeds.feedTitle).first()    
         flag=1
-        if(result!=None):
-            c.execute("SELECT * FROM feeds WHERE feedTitle = ? AND category = ?",(feeds.feedTitle,feeds.category))
-            result=c.fetchone()
-            if(result!=None):
+        if exist:
+            exist=Feeds.query.filter_by(feedTitle=feeds.feedTitle,category=feeds.category).first()    
+            if exist:
                 flag=0
+        
         if(flag==1):
-            result=c.execute("SELECT * FROM users WHERE userId = ?",(feeds.userId,))
-            if(result==None):
-                conn.commit()
-                conn.close()    
+            exist=Users.query.filter_by(userId=feeds.userId).first()    
+            if not exist:    
                 return 0
-            c.execute("INSERT INTO feeds(feedTitle,summary,time,imageUrl,category,author,link,likes,dislikes,dispTime,logo,userId) VALUES (:feedTitle,:summary,:time,:imageUrl,:category,:author,:link,:likes,:dislikes,:dispTime,:logo,:userId)",{'feedTitle':feeds.feedTitle,'summary':feeds.summary,'time':feeds.time,'imageUrl':feeds.imageUrl,'category':feeds.category,'author':feeds.author,'link':feeds.link,'likes':0,'dislikes':0,'dispTime':feeds.dispTime,'logo':feeds.logo,'userId':feeds.userId})
+            db.session.add(Feeds(feeds.userId,feeds.feedTitle,feeds.summary,feeds.time,feeds.imageUrl,feeds.category,feeds.author,feeds.link,0,0,feeds.dispTime,feeds.logo))
             if userInput==1:
-                conn.commit()
-                conn.close()
                 return 1
-    c.execute("SELECT * FROM feeds")
-    records = c.fetchall()
-    conn.commit()
-    conn.close()
+    
     if userInput==1 and flag==0:
         return 0
+    
+    feeds_exist=FeedXmls.query.all()
+    records=[]
+    for rows in feeds_exist:
+        records.append((rows.feedXmlId,rows.category))
     return records
     
 #rp
