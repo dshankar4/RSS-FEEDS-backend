@@ -11,3 +11,4 @@ class feeds:
         self.dispTime=dispTime
         self.logo=logo
         self.userId=userId
+

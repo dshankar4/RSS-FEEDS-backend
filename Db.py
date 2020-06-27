@@ -1,6 +1,151 @@
-import sqlite3
-from flask import flash
+from flask import flash,Flask
+from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
+from __main__ import app,login_manager,admin
+from sqlalchemy import event
+from flask_admin import Admin, AdminIndexView
+from flask_admin.menu import MenuLink
+from flask_admin.contrib.sqla import ModelView
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager,UserMixin,login_user,current_user,logout_user,login_required
+import sqlite3
+
+app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///feeds.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
+db= SQLAlchemy(app)
+
+class FeedXmls(db.Model):
+    __tablename__="feedXmls"
+    feedXmlId=db.Column('feedXmlId',db.Integer,primary_key=True)
+    feedXml=db.Column('feedXml',db.String)
+    category=category=db.Column('category',db.String)
+    
+    def __init__(self,feedXml,category):
+        self.feedXml=feedXml
+        self.category=category
+        
+class Roles(db.Model):
+    __tablename__="roles"
+    adminId= db.Column('adminId',db.Integer,primary_key=True)
+    role=db.Column('role',db.String,unique=True, nullable=False)
+    
+    def __init__(self,role):
+        self.role=role
+
+    
+class Users(db.Model,UserMixin):
+    __tablename__="users"
+    userId=db.Column('userId',db.Integer,primary_key=True)
+    adminId=db.Column('adminId',db.Integer,db.ForeignKey('roles.adminId'))
+    roles = db.relationship("Roles", backref='adminId_roles')
+    firstname=db.Column('firstname',db.String)
+    lastname=db.Column('lastname',db.String)
+    email=db.Column('email',db.String,unique=True)
+    password=db.Column('password',db.String)
+    
+    def __init__(first_name,last_name,email,password,adminId):
+        self.adminId=exist
+        self.firstname=first_name
+        self.lastname=last_name
+        self.email=email
+        self.password=password
+        
+    def get_id(self):
+        return (self.userId)
+    
+class Feeds(db.Model):
+    __tablename__="feeds"
+    feedId=db.Column('feedId',db.Integer,primary_key=True)
+    userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
+    users = db.relationship("Users", backref='userId_feeds')
+    feedTitle=db.Column('feedTitle',db.String,unique=True)
+    summary=db.Column('summary',db.String)
+    time=db.Column('time',db.String)
+    imageUrl=db.Column('imageUrl',db.String)
+    category=db.Column('category',db.String)
+    author=db.Column('author',db.String)
+    link=db.Column('link',db.String)
+    likes=db.Column('likes',db.Integer)
+    dislikes=db.Column('dislikes',db.Integer)
+    dispTime=db.Column('dispTime',db.String)
+    logo=db.Column('logo',db.String)
+
+    def __init__(self,userId,feedTitle,summary,time,imageUrl,category,author,link,likes,dislikes,dispTime,logo):
+        self.userId=userId
+        self.feedTitle=feedTitle
+        self.summary=summary
+        self.time=time
+        self.imageUrl=imageUrl
+        self.category=category
+        self.author=author
+        self.link=link
+        self.likes=likes
+        self.dislikes=dislikes
+        self.dispTime=dispTime
+        self.logo=logo
+
+class Comments(db.Model):
+    __tablename__="comments"
+    commentId=db.Column('commentId',db.Integer,primary_key=True)
+    userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
+    users = db.relationship("Users", backref='userId_comments')
+    feedId=db.Column('feedId',db.Integer,db.ForeignKey('feeds.feedId'))
+    feeds = db.relationship("Feeds", backref='feedId_comments')
+    comment=db.Column('comment',db.String)
+
+    def __init__(self,userId,feedId,comment):
+        self.userId=userId
+        self.feedId=feedId
+        self.comment=comment
+
+class UserLike(db.Model):
+    __tablename__="userLike"
+    userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
+    users = db.relationship("Users", backref='userId_userlike')
+    feedId=db.Column('feedId',db.Integer,db.ForeignKey('feeds.feedId'))
+    feeds = db.relationship("Feeds", backref='feedId_userlike')
+    like=db.Column('like',db.Boolean)
+    dislike=db.Column('dislike',db.Boolean)
+    likeId=db.Column('likeId',db.Integer,primary_key=True)
+    
+    def __init__(self,userId,feedId,like,dislike):
+        self.userId=userId
+        self.feedId=feedId
+        self.like=like
+        self.dislike=dislike
+        
+        
+class SpecialRights(db.Model):
+    __tablename__="specialRights"
+    colId= db.Column('colId',db.Integer,primary_key=True)
+    userId=db.Column('userId',db.Integer,db.ForeignKey('users.userId'))
+    users = db.relationship("Users", backref='userId_specialRights')
+    cFeed= db.Column('cFeed',db.Boolean)
+    rFeed= db.Column('rFeed',db.Boolean)
+    uFeed= db.Column('uFeed',db.Boolean)
+    dFeed= db.Column('dFeed',db.Boolean)
+    rolesTable=db.Column('rolesTable',db.Boolean)
+    usersTable=db.Column('usersTable',db.Boolean)
+    feedsTable=db.Column('feedsTable',db.Boolean)
+    userLikeTable=db.Column('userLikeTable',db.Boolean)
+    commentTable=db.Column('commentTable',db.Boolean)
+    feedXmlsTable=db.Column('feedXmlsTable',db.Boolean)
+
+    def __init__(self,userId,users,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
+        self.userId=userId
+        self.users=users
+        self.cFeed=cFeed
+        self.rFeed=rFeed
+        self.uFeed=uFeed
+        self.dFeed=dFeed
+        self.rolesTable=rolesTable
+        self.usersTable=usersTable
+        self.feedsTable=feedsTable
+        self.userLikeTable=userLikeTable
+        self.commentTable=commentTable
+        self.feedXmlsTable=feedXmlsTable
+        
+db.create_all()
 
 # handleDb to Handle initial Db operations
 def handleDb():
@@ -106,19 +251,16 @@ def handleDb():
         c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/business/rssfeed.xml','category':'Business'})
         c.execute("INSERT INTO feedxmls (feedXml,category) VALUES (:feedXml,:category)",{'feedXml':'https://www.hindustantimes.com/rss/lifestyle/rssfeed.xml','category':'Lifestyle'})
         conn.commit()
-    
     conn.close()
     
+#rp
 #Register user    
-def registerUser(first_name,last_name,email,password,role):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM roles where role=?",(role,))
-    role = c.fetchone()
-    c.execute("INSERT INTO users (adminId,firstname,lastname,email,password) VALUES (:adminId,:firstname,:lastname,:email,:password)",{'adminId':role[0],'firstname':first_name,'lastname':last_name,'email':email,'password':password})
-    conn.commit()
-    conn.close()
+def registerUser(first_name,last_name,email,password,roles):
+    exist=Roles.query.filter_by(role=roles).first()    
+    if exist:
+        db.session.add(Users(first_name,last_name,email,password,exist.adminId))
     
+#rp
 #getXml function fetches all the RSS feeds from the database.
 def getXml():
     conn = sqlite3.connect('Feeds.db')
@@ -129,6 +271,7 @@ def getXml():
     conn.close()
     return records
 
+#rp
 #Updates the database with new feeds.Handles multiple copies in the database if any
 def getFeeds(allFeeds,userInput=0):
     conn = sqlite3.connect('Feeds.db')
@@ -161,6 +304,7 @@ def getFeeds(allFeeds,userInput=0):
         return 0
     return records
     
+#rp
 #Select email to check if there is no matching email   
 def selectEmail(email):
     conn = sqlite3.connect('Feeds.db')
@@ -170,7 +314,8 @@ def selectEmail(email):
     conn.commit()
     conn.close()
     return records
-    
+
+#Shankar    
 #Add comment for userId in feedid
 def addComment(feedId,userId,comment):
     conn = sqlite3.connect('Feeds.db')
@@ -180,6 +325,7 @@ def addComment(feedId,userId,comment):
     conn.close()
     return {'message':'comment posted','format':'True'}
 
+#rp
 #Get comments for the feedId
 def getComment(feedId):
     conn = sqlite3.connect('Feeds.db')
@@ -197,6 +343,7 @@ def getComment(feedId):
         return {'message':'invalid commentId','Format': 'False'}
     return returnDict
 
+#shankar
 #Add feedUrl and category
 def feedUrlAdd(url,newCategory):
     conn = sqlite3.connect('Feeds.db')
@@ -212,6 +359,7 @@ def feedUrlAdd(url,newCategory):
     conn.close()
     return {'message':'url added','Format': 'True'}
 
+#rp
 def feedEdit(title,summary,category,author,link,feedId):
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -221,6 +369,7 @@ def feedEdit(title,summary,category,author,link,feedId):
     conn.close()
     return feed
 
+#rp
 def addLikes(userId,feedId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -239,6 +388,7 @@ def addLikes(userId,feedId):
     conn.close()
     return records
         
+#rp
 def addDislikes(userId,feedId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -256,7 +406,8 @@ def addDislikes(userId,feedId):
     conn.commit()
     conn.close()
     return records
-    
+
+#shankar    
 def checkFeedId(feedId):
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -269,6 +420,7 @@ def checkFeedId(feedId):
     else:
         return 0
 
+#shankar
 def checkUserId(userId):
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -281,6 +433,7 @@ def checkUserId(userId):
     else:
         return 0
 
+#shankar
 # New Role appending in Database
 def newRole(id,role):
     conn = sqlite3.connect('Feeds.db')
@@ -296,6 +449,7 @@ def newRole(id,role):
     conn.close()
     return {'message':'role added','Format':'True'}, 200
 
+#rp
 #To display all roles
 def getRole():
     conn = sqlite3.connect('Feeds.db')
@@ -313,6 +467,7 @@ def getRole():
     else:
         return {'message':'role doesnt exist','Format':'False'}, 401
 
+#shankar
 #To delete a role
 def deleteRole(adminId):
     conn = sqlite3.connect('Feeds.db')
@@ -327,6 +482,7 @@ def deleteRole(adminId):
     else:
         return {'Format':'False'}, 401
 
+#rp
 def getAccess(userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -343,6 +499,7 @@ def getAccess(userId):
     else:
         return {'message':'no access right','Format':'False'}, 401
 
+#shankar
 def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -359,6 +516,7 @@ def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feed
         conn.close()
         return {"message":"new role",'fomrat':'True'}
 
+#shankar
 def deleteAccess(id):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -372,14 +530,15 @@ def deleteAccess(id):
     else:
         return {"message":"incorrect access"}
 
-
+#shankar
 def deleteFeed(feedId,userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
     c.execute("DELETE FROM feeds WHERE feedId=? and userId=?",(feedId,userId))    
     conn.commit()
     conn.close()
-    
+   
+#shankar   
 def deleteUser(userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -387,6 +546,7 @@ def deleteUser(userId):
     conn.commit()
     conn.close()
     
+#rp
 def getSpecialRights(userId):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
@@ -396,6 +556,7 @@ def getSpecialRights(userId):
     conn.close()
     return records
 
+#shankar
 def commentDelete(commentId):
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -408,6 +569,7 @@ def commentDelete(commentId):
     else:
         return {"message":"comment doesn't exist",'format':'False'}
 
+#rp
 def getUser(userId):
     conn = sqlite3.connect('Feeds.db')
     c = conn.cursor()
@@ -422,3 +584,4 @@ def getUser(userId):
         return {'feeds':records,'format':'True'}
     else:
         return {"message":"no feeds",'format':'False'}
+
