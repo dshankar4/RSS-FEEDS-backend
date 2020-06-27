@@ -39,7 +39,12 @@ from Db import selectEmail,registerUser,addComment,getComment,feedEdit,feedUrlAd
 from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,deleteFeed,deleteUser,getSpecialRights, commentDelete,getUser, getAccess, updateAccess,deleteAccess
 from admin import Controllers,RolesController,UsersController,FeedsController,UserLikeController,CommentController,FeedXmlsController,Controller
 from admin import hashPass,load_user,adminLogin,adminLogout
-
+# accessToken=None
+# records=returnRecord()
+# recordsNoRep=returnNoRepRecord(records)
+# data=returnData(records)
+# allFeeds=data[0]
+# category=data[1]
 # Register
 class register(Resource):
     def post(self):
@@ -286,8 +291,7 @@ class deleteUserById(Resource):
 class deleteFeedById(Resource):
     def get(self,feedId,userId):
         if checkFeedId(feedId) and checkUserId(userId):
-            deleteFeed(feedId,userId)
-            return {'message':'feed deleted','Format': 'True'}, 200              
+            return deleteFeed(feedId,userId)
         else:
             return {'message':'Bad Request','Format': 'False'}, 401
 
@@ -303,9 +307,8 @@ class role(Resource):
         id = request.get_json()['id']
         return deleteRole(id)
     def post(self):
-        id = request.get_json()['id']
         role = request.get_json()['role']
-        return newRole(id,role)
+        return newRole(role)
 
 class access(Resource):
     def get(self):
@@ -328,7 +331,6 @@ class access(Resource):
     def delete(self):
         id = request.get_json()['id']
         return deleteAccess(id)
-
 
 
 #App routes

@@ -131,9 +131,8 @@ class SpecialRights(db.Model):
     commentTable=db.Column('commentTable',db.Boolean)
     feedXmlsTable=db.Column('feedXmlsTable',db.Boolean)
 
-    def __init__(self,userId,users,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
+    def __init__(self,userId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
         self.userId=userId
-        self.users=users
         self.cFeed=cFeed
         self.rFeed=rFeed
         self.uFeed=uFeed
@@ -266,7 +265,7 @@ def getXml():
     feeds_exist=FeedXmls.query.all()
     records=[]
     for rows in feeds_exist:
-        records.append((rows.feedXmlId,rows.category))
+        records.append((rows.feedXmlId,rows.feedXml,rows.category))
     return records
 
 
@@ -294,7 +293,7 @@ def getFeeds(allFeeds,userInput=0):
     feeds_exist=FeedXmls.query.all()
     records=[]
     for rows in feeds_exist:
-        records.append((rows.feedXmlId,rows.category))
+        records.append((rows.feedXmlId,rows.feedXml,rows.category))
     return records
     
 #rp
@@ -311,11 +310,8 @@ def selectEmail(email):
 #Shankar    
 #Add comment for userId in feedid
 def addComment(feedId,userId,comment):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("INSERT INTO comments (userId,feedId,comment) VALUES (:userId,:feedId,:comment)",{'userId':userId,'feedId':feedId,'comment':comment})
-    conn.commit()
-    conn.close()
+    db.session.add(Comments(userId,feedId,comment))
+    db.session.commit()
     return {'message':'comment posted','format':'True'}
 
 #rp
@@ -341,15 +337,13 @@ def getComment(feedId):
 def feedUrlAdd(url,newCategory):
     conn = sqlite3.connect('Feeds.db')
     c= conn.cursor()
-    record=c.execute("SELECT feedXml,category FROM feedXmls WHERE feedXml=(:url) and category=(:category)",{'url':url,'category':newCategory})
+    record=FeedXmls.query.filter_by(feedxml=url,category=newCategory).first()    
     if record:
         conn.commit()
         conn.close()
         return {'message':'Bad Request','Format': 'False'}
-    c.execute("INSERT INTO feedXmls (feedXml,category) VALUES (:url,:category)",{'url':url,'category':newCategory})
-    records = c.fetchone()
-    conn.commit()
-    conn.close()
+    db.session.add(FeedXmls(url,newCategory))
+    db.session.commit()
     return {'message':'url added','Format': 'True'}
 
 #rp
@@ -402,44 +396,28 @@ def addDislikes(userId,feedId):
 
 #shankar    
 def checkFeedId(feedId):
-    conn = sqlite3.connect('Feeds.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM feeds where feedId = (:value)",{'value':feedId})
-    record = c.fetchone()
-    conn.commit()
-    conn.close()
-    if record:
+    userId=Feeds.query.filter_by(feedId=feedId).first()
+    if userId:
         return 1
     else:
         return 0
 
 #shankar
 def checkUserId(userId):
-    conn = sqlite3.connect('Feeds.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM users where userId = (:value)",{'value':userId})
-    record = c.fetchone()
-    conn.commit()
-    conn.close()
-    if record:
+    userId=Users.query.filter_by(userId=userId).first()
+    if userId:
         return 1
     else:
         return 0
 
 #shankar
 # New Role appending in Database
-def newRole(id,role):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM roles where role=?",(role,))
-    records = c.fetchone()
-    if records:
-        conn.commit()
-        conn.close()
+def newRole(role):
+    newRole=Roles.query.filter_by(role=role).first()
+    if newRole:
         return {'Format':'False','message':'Role already exist'}, 401
-    c.execute("INSERT INTO roles (adminId,role) VALUES (:adminId,:role)",{'adminId':id,'role':role})
-    conn.commit()
-    conn.close()
+    db.session.add(Roles(role))
+    db.session.commit()
     return {'message':'role added','Format':'True'}, 200
 
 #rp
@@ -463,14 +441,10 @@ def getRole():
 #shankar
 #To delete a role
 def deleteRole(adminId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM roles where adminId=?",(adminId,))
-    records = c.fetchone()
-    if records:
-        c.execute("DELETE FROM roles WHERE adminId=(:adminId)",{'adminId':adminId})
-        conn.commit()
-        conn.close()
+    newRole=Roles.query.filter_by(adminId=adminId).first()
+    if newRole:
+        db.session.delete(newRole)
+        db.session.commit()
         return {'Format':'True'}, 200
     else:
         return {'Format':'False'}, 401
@@ -494,51 +468,56 @@ def getAccess(userId):
 
 #shankar
 def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM specialRights where colId=?",(colId,))
-    records = c.fetchone()
-    if records:
-        c.execute("UPDATE specialRights SET cFeed = (:cFeed), rFeed = (:rFeed), uFeed = (:uFeed), dFeed = (:dFeed), rolesTable = (:rolesTable), usersTable = (:usersTable), feedsTable = (:feedsTable), userLikeTable = (:userLikeTable), commentTable = (:commentTable), feedXmlsTable = (:feedXmlsTable) WHERE colId = (:id)",{'cFeed':cFeed,'rFeed':rFeed,'uFeed':uFeed,'dFeed':dFeed,'rolesTable':rolesTable,'usersTable':usersTable,'feedsTable':feedsTable,'userLikeTable':userLikeTable,'commentTable':commentTable,'feedXmlsTable':feedXmlsTable,'id':colId})
-        conn.commit()
-        conn.close()
+    specialRights=SpecialRights.query.filter_by(colId=colId).first()
+    if specialRights:
+        specialRights.userId=userId
+        specialRights.cFeed=cFeed
+        specialRights.rFeed=rFeed
+        specialRights.uFeed=uFeed
+        specialRights.dFeed=dFeed
+        specialRights.rolesTable=rolesTable
+        specialRights.usersTable=usersTable
+        specialRights.feedsTable=feedsTable
+        specialRights.userLikeTable=userLikeTable
+        specialRights.commentTable=commentTable
+        specialRights.feedXmlsTable=feedXmlsTable
+        db.session.commit()
         return {"message":"updated",'format':'True'}
     else:
-        c.execute("INSERT into specialRights (cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable,userId,colId) VALUES (:cFeed,:rFeed,:uFeed,:dFeed,:rolesTable,:usersTable,:feedsTable,:userLikeTable,:commentTable,:feedXmlsTable,:userId,:colId) ",{'cFeed':cFeed,'rFeed':rFeed,'uFeed':uFeed,'dFeed':dFeed,'rolesTable':rolesTable,'usersTable':usersTable,'feedsTable':feedsTable,'userLikeTable':userLikeTable,'commentTable':commentTable,'feedXmlsTable':feedXmlsTable,'userId':userId,'colId':colId})
-        conn.commit()
-        conn.close()
+        db.session.add(SpecialRights(userId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable))
+        db.session.commit()
         return {"message":"new role",'fomrat':'True'}
 
 #shankar
 def deleteAccess(id):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM specialRights where colId=?",(id,))
-    records = c.fetchone()
-    if records:
-        c.execute("DELETE FROM specialRights where colId=?",(id,))
-        conn.commit()
-        conn.close()
+    specialRights=SpecialRights.query.filter_by(colId=id).first()
+    if specialRights:
+        db.session.delete(specialRights)
+        db.session.commit()
         return {"message":"access deleted"}
     else:
         return {"message":"incorrect access"}
 
 #shankar
 def deleteFeed(feedId,userId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("DELETE FROM feeds WHERE feedId=? and userId=?",(feedId,userId))    
-    conn.commit()
-    conn.close()
-   
+    feed=Feeds.query.filter_by(feedId=feedId,userId=userId).first()
+    if feed:
+        db.session.delete(feed)
+        db.session.commit()
+        return {"message":"feed deleted"}
+    else:
+        return {"message":"Bad Request"}
+
 #shankar   
 def deleteUser(userId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("DELETE FROM users WHERE userId=?",(userId,))
-    conn.commit()
-    conn.close()
-    
+    user=Users.query.filter_by(userId=userId).first()
+    if user:
+        db.session.delete(user)
+        db.session.commit()
+        return {"message":"user deleted"}
+    else:
+        return {"message":"Bad Request"}
+
 #rp
 def getSpecialRights(userId):
     conn = sqlite3.connect('Feeds.db')
@@ -551,13 +530,10 @@ def getSpecialRights(userId):
 
 #shankar
 def commentDelete(commentId):
-    conn = sqlite3.connect('Feeds.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM comments where commentId=(:commentId)",{'commentId':commentId})
-    if c.fetchone():
-        c.execute("DELETE FROM comments where commentId = (:commentId)",{'commentId':commentId})
-        conn.commit()
-        conn.close()
+    comment=Comments.query.filter_by(commentId=commentId).first()
+    if comment:
+        db.session.delete(comment)
+        db.session.commit()
         return {"message":"comment deleted",'format':'True'}
     else:
         return {"message":"comment doesn't exist",'format':'False'}
@@ -577,4 +553,12 @@ def getUser(userId):
         return {'feeds':records,'format':'True'}
     else:
         return {"message":"no feeds",'format':'False'}
+
+
+
+
+
+
+
+
 
