@@ -10,21 +10,22 @@ from flask_admin.contrib.sqla import ModelView
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager,UserMixin,login_user,current_user,logout_user,login_required
 import feedparser
-import os
+from os import environ
 import re
-
+from dotenv import load_dotenv
+from pathlib import Path
 app = Flask(__name__)
 bcrypt = Bcrypt(app)
 jwt = JWTManager(app)
 api = Api(app)
-app.config['SECRET_KEY']=os.environ.get('SECRET_KEY')
-app.config['JWT_SECRET_KEY']=os.environ.get('JWT_SECRET_KEY')
+app.config['SECRET_KEY']=environ.get('SECRET_KEY')
+app.config['JWT_SECRET_KEY']=environ.get('JWT_SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI']='sqlite:///feeds.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
-app.config['FLASK_ADMIN_SWATCH'] = 'Darkly' 
+app.config['FLASK_ADMIN_SWATCH'] = environ.get('FLASK_ADMIN_SWATCH')
 login_manager= LoginManager()
 login_manager.init_app(app)
-    
+
 class MyAdminIndexView(AdminIndexView):
     def is_visible(self):
         return False
