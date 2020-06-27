@@ -253,12 +253,13 @@ def handleDb():
     conn.close()
     
 
+
 #Register user    
 def registerUser(first_name,last_name,email,password,roles):
     exist=Roles.query.filter_by(role=roles).first()    
     if exist:
         db.session.add(Users(first_name,last_name,email,password,exist.adminId))
-    
+        db.session.commit()
 
 #getXml function fetches all the RSS feeds from the database.
 def getXml():
@@ -284,59 +285,35 @@ def getFeeds(allFeeds,userInput=0):
             if not exist:    
                 return 0
             db.session.add(Feeds(feeds.userId,feeds.feedTitle,feeds.summary,feeds.time,feeds.imageUrl,feeds.category,feeds.author,feeds.link,0,0,feeds.dispTime,feeds.logo))
+            db.session.commit()
             if userInput==1:
                 return 1
     
     if userInput==1 and flag==0:
         return 0
     
-    feeds_exist=FeedXmls.query.all()
+    feeds_exist=Feeds.query.all()
     records=[]
     for rows in feeds_exist:
-        records.append((rows.feedXmlId,rows.feedXml,rows.category))
+        records.append((rows.feedId,rows.feedTitle,rows.summary,rows.time,rows.imageUrl,rows.category,rows.author,rows.link,rows.likes,rows.dislikes,rows.dispTime,rows.logo,rows.userId))
     return records
     
-#rp
 #Select email to check if there is no matching email   
 def selectEmail(email):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM users where email = ?",(email,))
-    records = c.fetchone()
-    conn.commit()
-    conn.close()
-    return records
+    user=Users.query.filter_by(email=email).first()
+    if user:
+        return [user.adminId,user.userId,user.firstname,user.lastname,user.email,user.password]
+    else:
+        return None
 
-#Shankar    
 #Add comment for userId in feedid
 def addComment(feedId,userId,comment):
     db.session.add(Comments(userId,feedId,comment))
     db.session.commit()
     return {'message':'comment posted','format':'True'}
 
-#rp
-#Get comments for the feedId
-def getComment(feedId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM comments WHERE feedId=?",(feedId,))
-    comments=c.fetchall()
-    conn.commit()
-    conn.close()
-    returnDict={}
-    returnDict['Format']='True'
-    returnDict['values']=list()
-    for rows in comments:
-        returnDict['values'].append({'userId':rows[0],'comment':rows[2]})
-    if len(returnDict['values'])==0:
-        return {'message':'invalid commentId','Format': 'False'}
-    return returnDict
-
-#shankar
 #Add feedUrl and category
 def feedUrlAdd(url,newCategory):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
     record=FeedXmls.query.filter_by(feedxml=url,category=newCategory).first()    
     if record:
         conn.commit()
@@ -346,55 +323,70 @@ def feedUrlAdd(url,newCategory):
     db.session.commit()
     return {'message':'url added','Format': 'True'}
 
-#rp
-def feedEdit(title,summary,category,author,link,feedId):
-    conn = sqlite3.connect('Feeds.db')
-    c = conn.cursor()
-    c.execute("UPDATE feeds SET feedTitle = (:title), summary = (:summary), category = (:category), author = (:author), link = (:link) WHERE feedId = (:id)",{'title':title,'summary':summary,'category':category,'author':author,'link':link,'id':feedId})
-    feed=c.fetchone()
-    conn.commit()
-    conn.close()
-    return feed
 
-#rp
+#Get comments for the feedId
+def getComment(feedId):
+    comments=Comments.query.filter_by(feedId=feedId)
+    returnDict={}
+    returnDict['Format']='True'
+    returnDict['values']=list()
+    for rows in comments:
+        returnDict['values'].append({'userId':rows.userId,'comment':rows.comment})
+    if len(returnDict['values'])==0:
+        return {'message':'invalid commentId','Format': 'False'}
+    return returnDict
+
+#Edit feed
+def feedEdit(title,summary,category,author,link,feedId):
+    rows=Feeds.query.filter_by(feedId=feedId).first()
+    rows.feedTitle=title
+    rows.summary=summary
+    rows.category=category
+    rows.author=author
+    rows.link=link
+    db.session.commit()
+    return [rows.feedId,rows.feedTitle,rows.summary,rows.time,rows.imageUrl,rows.category,rows.author,rows.link,rows.likes,rows.dislikes,rows.dispTime,rows.logo,rows.userId]
+#likes
 def addLikes(userId,feedId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM userLike where feedId = ? and userId=?",(feedId,userId))
-    records = c.fetchone()
+    records=UserLike.query.filter_by(feedId=feedId,userId=userId).first()
     if records:
-        if records[2] == 0:
-            c.execute("update userLike set like=(:like),dislike=(:dislike) where userId=(:userId) and feedId=(:feedId)",{'like':"1",'dislike':"0",'userId':userId,'feedId':feedId})
-            c.execute("update feeds set likes=likes+1,dislikes=dislike-1 where feedId=(:feedId)",{'feedId':feedId})
+        if records.like == 0 and records.dislike == 1:
+            records.like=1
+            records.dislike=0
+            record=Feeds.query.filter_by(feedId=feedId).first()
+            record.likes+=1
+            record.dislike-=1
         else:
             return {"message":"liked before itself"}
     else:
-        c.execute("INSERT INTO userLike (userId,feedId,like,dislike) VALUES (:userId,:feedId,:like,:dislike)",{'userId':userId,'feedId':feedId,'like':"1","dislike":"0"})
-        c.execute("update feeds set likes=likes+1 where feedId=(:feedId)",{'feedId':feedId})
-    conn.commit()
-    conn.close()
-    return records
+        db.session.add(UserLike(userId,feedId,1,0))
+        record=Feeds.query.filter_by(feedId=feedId).first()
+        record.likes+=1
+    
+    db.session.commit()
+    return [records.userId,records.feedId,records.like,records.dislike]
         
-#rp
+#dislikes
 def addDislikes(userId,feedId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM userLike where feedId = ? and userId=?",(feedId,userId))
-    records = c.fetchone()
+    records=UserLike.query.filter_by(feedId=feedId,userId=userId).first()    
     if records:
-        if records[3] == 0:
-            c.execute("update userLike set like=(:like),dislike=(:dislike) where userId=(:userId) and feedId=(:feedId)",{'like':"0",'dislike':"1",'userId':userId,'feedId':feedId})
-            c.execute("update feeds set likes=likes-1,dislikes=dislikes+1 where feedId=(:feedId)",{'feedId':feedId})
+        if records.like == 1 and records.dislike == 0:
+                records.like=0
+                records.dislike=1
+                record=Feeds.query.filter_by(feedId=feedId).first()
+                record.likes-=1
+                record.dislike+=1
         else:
             return {"message":"disliked before itself"}
     else:
-        c.execute("INSERT INTO userLike (userId,feedId,like,dislike) VALUES (:userId,:feedId,:like,:dislike)",{'userId':userId,'feedId':feedId,'like':"0","dislike":"1"})
-        c.execute("update feeds set dislikes=dislikes+1 where feedId=(:feedId)",{'feedId':feedId})
-    conn.commit()
-    conn.close()
-    return records
+        db.session.add(UserLike(userId,feedId,0,1))
+        record=Feeds.query.filter_by(feedId=feedId).first()
+        record.dislikes+=1
+    
+    db.session.commit()
+    return [records.userId,records.feedId,records.like,records.dislike]
 
-#shankar    
+#check feed Id    
 def checkFeedId(feedId):
     userId=Feeds.query.filter_by(feedId=feedId).first()
     if userId:
@@ -402,7 +394,7 @@ def checkFeedId(feedId):
     else:
         return 0
 
-#shankar
+#check user Id
 def checkUserId(userId):
     userId=Users.query.filter_by(userId=userId).first()
     if userId:
@@ -410,7 +402,7 @@ def checkUserId(userId):
     else:
         return 0
 
-#shankar
+
 # New Role appending in Database
 def newRole(role):
     newRole=Roles.query.filter_by(role=role).first()
@@ -420,16 +412,13 @@ def newRole(role):
     db.session.commit()
     return {'message':'role added','Format':'True'}, 200
 
-#rp
 #To display all roles
 def getRole():
-    conn = sqlite3.connect('Feeds.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM roles")
-    record = c.fetchall()
-    conn.commit()
-    conn.close()
+    roles=Roles.query.all()
     rolesDict={}
+    record=[]
+    for rows in roles:
+        record.append((rows.adminId,rows.role))
     if record:
         rolesDict['Values']=list()
         for rows in record:
@@ -438,7 +427,6 @@ def getRole():
     else:
         return {'message':'role doesnt exist','Format':'False'}, 401
 
-#shankar
 #To delete a role
 def deleteRole(adminId):
     newRole=Roles.query.filter_by(adminId=adminId).first()
@@ -449,14 +437,13 @@ def deleteRole(adminId):
     else:
         return {'Format':'False'}, 401
 
-#rp
+#get Access
 def getAccess(userId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
+    rights=SpecialRights.query.all()
+    record=[]
+    for rows in rights:
+        record.append((rows.userId,rows.cFeed,rows.rFeed,rows.uFeed,rows.dFeed,rows.rolesTable,rows.usersTable,rows.feedsTable,rows.userLikeTable,rows.commentTable,rows.feedXmlsTable))    
     c.execute("SELECT * FROM specialRights")
-    record = c.fetchall()
-    conn.commit()
-    conn.close()
     rolesDict={}
     if record:
         rolesDict['Values']=list()
@@ -466,7 +453,7 @@ def getAccess(userId):
     else:
         return {'message':'no access right','Format':'False'}, 401
 
-#shankar
+#update access
 def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feedsTable,userLikeTable,commentTable,feedXmlsTable):
     specialRights=SpecialRights.query.filter_by(colId=colId).first()
     if specialRights:
@@ -488,7 +475,7 @@ def updateAccess(userId,colId,cFeed,rFeed,uFeed,dFeed,rolesTable,usersTable,feed
         db.session.commit()
         return {"message":"new role",'fomrat':'True'}
 
-#shankar
+#delete access
 def deleteAccess(id):
     specialRights=SpecialRights.query.filter_by(colId=id).first()
     if specialRights:
@@ -498,7 +485,7 @@ def deleteAccess(id):
     else:
         return {"message":"incorrect access"}
 
-#shankar
+#delete feed
 def deleteFeed(feedId,userId):
     feed=Feeds.query.filter_by(feedId=feedId,userId=userId).first()
     if feed:
@@ -508,7 +495,7 @@ def deleteFeed(feedId,userId):
     else:
         return {"message":"Bad Request"}
 
-#shankar   
+#delete user   
 def deleteUser(userId):
     user=Users.query.filter_by(userId=userId).first()
     if user:
@@ -518,17 +505,15 @@ def deleteUser(userId):
     else:
         return {"message":"Bad Request"}
 
-#rp
+# Get rights    
 def getSpecialRights(userId):
-    conn = sqlite3.connect('Feeds.db')
-    c= conn.cursor()
-    c.execute("SELECT * FROM specialRights WHERE userId=?",(userId,))
-    records=c.fetchall()
-    conn.commit()
-    conn.close()
-    return records
+    rights=SpecialRights.query.filter_by(userId=userId)    
+    records=[]
+    for rows in rights:
+        records.append((rows.colId,rows.userId,rows.cFeed,rows.rFeed,rows.uFeed,rows.dFeed,rows.rolesTable,rows.usersTable,rows.feedsTable,rows.userLikeTable,rows.commentTable,rows.feedXmlsTable))
+    return records 
 
-#shankar
+#delete comment
 def commentDelete(commentId):
     comment=Comments.query.filter_by(commentId=commentId).first()
     if comment:
@@ -538,16 +523,13 @@ def commentDelete(commentId):
     else:
         return {"message":"comment doesn't exist",'format':'False'}
 
-#rp
+#get User
 def getUser(userId):
-    conn = sqlite3.connect('Feeds.db')
-    c = conn.cursor()
-    c.execute("SELECT * FROM feeds where userId = (:userId)",{'userId':userId})
-    record = c.fetchall()
-    if record:
+    feeds=Feeds.query.filter_by(userId=userId).first()    
+    if feeds:
         records=[]
-        for feed in record:
-            records.append({'id':feed[0],'feedTitle':feed[1],'summary':feed[2],'dispTime':feed[3],'imgUrl':feed[4],'category':feed[5],'author':feed[6],'link':feed[7],'like':feed[8],'dislike':feed[9],'time':feed[10],'logo':feed[11],'userId':feed[12]})
+        for rows in feeds:         
+            records.append({'id':rows.feedId,'feedTitle':rows.feedTitle,'summary':rows.summary,'dispTime':rows.dispTime,'imgUrl':feeds.imgUrl,'category':feeds.category,'author':feeds.author,'link':feeds.link,'like':feeds.like,'dislike':feeds.dislike,'time':feeds.time,'logo':feeds.logo,'userId':feeds.userId})
         conn.commit()
         conn.close()
         return {'feeds':records,'format':'True'}
