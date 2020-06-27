@@ -34,18 +34,22 @@ admin=Admin(app,name='Admin Panel',template_mode='bootstrap3',index_view=MyAdmin
 
 from Db import FeedXmls,Roles,Users,Feeds,Comments,UserLike,SpecialRights,db
 from Db import handleDb,getXml,getFeeds
-from data import returnRecord,returnNoRepRecord,returnData
+from data import returnRecord,returnNoRepRecord,returnData,filtersort
 from Db import selectEmail,registerUser,addComment,getComment,feedEdit,feedUrlAdd,addLikes,addDislikes
-from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,deleteFeed,deleteUser,getSpecialRights, commentDelete,getUser, getAccess, updateAccess,deleteAccess
+from Db import newRole,getFeeds,checkUserId,checkFeedId,getRole,deleteRole,deleteFeed,deleteUser,getSpecialRights, commentDelete,getUser, getAccess, updateAccess,deleteAccess,getPost
 from admin import Controllers,RolesController,UsersController,FeedsController,UserLikeController,CommentController,FeedXmlsController,Controller
 from admin import hashPass,load_user,adminLogin,adminLogout
-# accessToken=None
-# records=returnRecord()
-# recordsNoRep=returnNoRepRecord(records)
-# data=returnData(records)
-# allFeeds=data[0]
-# category=data[1]
-# Register
+from models import feeds
+
+
+
+records=returnRecord()
+recordsNoRep=returnNoRepRecord(records)
+data=returnData(records)
+allFeeds=data[0]
+category=data[1]
+
+#Register
 class register(Resource):
     def post(self):
         first_name = request.get_json()['first_name']
@@ -90,6 +94,7 @@ class categoryList(Resource):
 class getFeedById(Resource):
     def get(self,feedId):
         if checkFeedId(feedId):
+            post=getPost(feedId)
             return {'format':'True','feeds': post, 'id': 'True'}, 200
         else:
             return {'format':'False'}, 401
@@ -256,7 +261,10 @@ class incrementDislikes(Resource):
             fId = checkFeedId(feedId)
             if fId:
                 disLikes = addDislikes(userId,feedId)
-                return {'message':'post disliked','Format': 'True'}, 200              
+                if disLikes==True:
+                    return {'message':'post disliked','Format': 'True'}, 200              
+                else:
+                    return {'message':'post already disliked','Format': 'False'}, 400              
             else:
                 return {'message':'feedid doesnt exist','Format': 'False'}, 400
         else:
@@ -270,7 +278,10 @@ class incrementLikes(Resource):
             fId = checkFeedId(feedId)
             if fId:
                 likes = addLikes(userId,feedId)
-                return {'message':'post liked','Format': 'True'}, 200              
+                if likes==True:
+                    return {'message':'post liked','Format': 'True'}, 200              
+                else:
+                    return {'message':'post already liked','Format': 'False'}, 400              
             else:
                 return {'message':'feedid doesnt exist','Format': 'False'}, 400
         else:
@@ -352,6 +363,7 @@ api.add_resource(user,'/user/<int:userId>')
 api.add_resource(role,'/role')
 api.add_resource(access,'/access')
 
+db.create_all()
 #Admin Panel
 admin.add_view(RolesController(Roles, db.session,category="Roles"))
 admin.add_view(UsersController(Users, db.session))
