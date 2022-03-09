@@ -4,3 +4,6 @@ This repository contains the backend code for the application.
 
 ## Postman Dopcumentaion
 https://documenter.getpostman.com/view/11647552/SzzoaviG#c8bbdaa1-6533-4c21-bdb9-b3ffcfc9606f
+
+## Deployment Link
+http://rssfeedflask.herokuapp.com/login
